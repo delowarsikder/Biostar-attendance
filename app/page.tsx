@@ -49,13 +49,8 @@ type AttendanceResponse = {
 };
 
 export default function Home() {
-  const today = new Date();
+  const [date, setDate] = useState("");
 
-  const localDate = `${today.getFullYear()}-${String(
-    today.getMonth() + 1
-  ).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-
-  const [date, setDate] = useState(localDate);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [shift, setShift] = useState<Shift | null>(null);
 
@@ -69,10 +64,22 @@ export default function Home() {
   const [statusFilter, setStatusFilter] = useState("all");
 
   /*
+ * Set today's date using Bangladesh timezone
+ */
+  useEffect(() => {
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Dhaka",
+    }).format(new Date());
+
+    setDate(today);
+  }, []);
+
+  /*
    * Load attendance
    */
-
   useEffect(() => {
+    if (!date) return;
+
     async function loadAttendance() {
       try {
         setLoading(true);
@@ -89,7 +96,8 @@ export default function Home() {
           throw new Error("Failed to load attendance");
         }
 
-        const data: AttendanceResponse = await response.json();
+        const data: AttendanceResponse =
+          await response.json();
 
         if (!data.success) {
           throw new Error(
@@ -115,7 +123,6 @@ export default function Home() {
 
     loadAttendance();
   }, [date, refreshKey]);
-
   /*
    * Summary
    */
@@ -141,37 +148,37 @@ export default function Home() {
    */
 
   const departments = useMemo(() => {
-    const map = new Map<number, string>();
+    const departmentMap = new Map<number, string>();
 
     attendance.forEach((record) => {
       if (
-        record.departmentId !== null &&
-        record.departmentId !== undefined
+        record.departmentId &&
+        record.departmentName
       ) {
-        map.set(
+        departmentMap.set(
           record.departmentId,
-          record.departmentName || `Department ${record.departmentId}`
+          record.departmentName
         );
       }
     });
 
-    return Array.from(map.entries()).sort((a, b) =>
-      a[1].localeCompare(b[1])
-    );
+    return Array.from(departmentMap.entries())
+      .map(([id, name]) => ({
+        id,
+        name,
+      }))
+      .sort((a, b) =>
+        a.name.localeCompare(b.name)
+      );
   }, [attendance]);
 
   /*
    * Filter attendance
    */
-
   const filteredAttendance = useMemo(() => {
     const searchValue = search.trim().toLowerCase();
 
     return attendance.filter((record) => {
-      /*
-       * Search
-       */
-
       const matchesSearch =
         !searchValue ||
         record.employeeId
@@ -181,17 +188,9 @@ export default function Home() {
           .toLowerCase()
           .includes(searchValue);
 
-      /*
-       * Department
-       */
-
       const matchesDepartment =
         department === "all" ||
         String(record.departmentId) === department;
-
-      /*
-       * Status
-       */
 
       let matchesStatus = true;
 
@@ -223,7 +222,6 @@ export default function Home() {
     department,
     statusFilter,
   ]);
-
   /*
    * Reset filters
    */
@@ -434,21 +432,18 @@ export default function Home() {
                 }
                 className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-black outline-none focus:border-gray-500"
               >
-
                 <option value="all">
                   All Departments
                 </option>
 
-                {departments.map(([id, name]) => (
+                {departments.map((dept) => (
                   <option
-                    key={id}
-                    value={String(id)}
+                    key={dept.id}
+                    value={String(dept.id)}
                   >
-                    {name}
+                    {dept.name}
                   </option>
                 ))}
-
-
               </select>
 
               {/* Status */}
