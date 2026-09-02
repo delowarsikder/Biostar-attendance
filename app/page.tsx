@@ -49,7 +49,6 @@ type AttendanceResponse = {
 };
 
 export default function Home() {
-  const [date, setDate] = useState("");
 
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [shift, setShift] = useState<Shift | null>(null);
@@ -66,13 +65,13 @@ export default function Home() {
   /*
  * Set today's date using Bangladesh timezone
  */
-  useEffect(() => {
-    const today = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Dhaka",
-    }).format(new Date());
 
-    setDate(today);
-  }, []);
+  const [date, setDate] = useState(() =>
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Dhaka",
+    }).format(new Date())
+  );
+
 
   /*
    * Load attendance

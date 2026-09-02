@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getBioStarDB } from "@/lib/biostar/db";
+import { getBioStarDB } from "@/lib/database/biostar/db";
 
 export async function GET() {
   try {

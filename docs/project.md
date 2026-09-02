@@ -267,5 +267,27 @@ Employee Master
                 IN→OUT        IN→IN/OUT→IN   OUT→IN
                   │              │              │
                 Normal         Review         Abnormal
-                
+
 ```
+
+                  ┌───────────────┐
+                  │ TB_EVENT_LOG  │
+                  └───────┬───────┘
+                          │
+             ┌────────────┼────────────┐
+             ▼            ▼            ▼
+        TB_USER       TB_READER    TB_EVENT_DATA
+             │            │            │
+             └────────────┼────────────┘
+                          ▼
+                 Event Repository
+                          │
+                          ▼
+                    Event Service
+                          │
+                          ▼
+                   Event Controller
+                          │
+                          ▼
+                /api/v1/events
+                

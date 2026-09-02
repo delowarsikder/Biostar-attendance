@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBioStarDB } from "@/lib/biostar/db";
+import { getBioStarDB } from "@/lib/database/biostar/db";
 
 const SHIFT_START = 9 * 60; // 09:00 = 540 minutes
 const SHIFT_END = 17 * 60; // 17:00 = 1020 minutes
@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
     ORDER BY u.sUserName
   `);
 
-    const attendance = result.recordset.map((record: any) => {
+    const attendance = result.recordset.map((record) => {
       const firstIn = Number(record.nStartTime) || 0;
       const lastOut = Number(record.nEndTime) || 0;
 
