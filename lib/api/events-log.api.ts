@@ -1,59 +1,47 @@
 import { apiClient } from "./client";
 
-export interface EventItem {
+export interface EventLogRecord {
   eventLogId: number;
-
   employeeId: string;
   employeeName: string;
-
   dateTime: string;
   time: string;
-
   readerId: number;
   readerName: string;
-
-  direction: "IN" | "OUT" | "UNKNOWN";
-
+  direction: string;
   eventId: number;
   eventName: string;
   eventDescription: string;
 }
 
-export interface EventsResponse {
+export interface EventsLogResponse {
   success: boolean;
-
-  data: {
-    total: number;
-    events: EventItem[];
-  };
+  data: EventLogRecord[];
+  message?: string;
 }
 
-export interface EventFilters {
+interface EventsLogParams {
   employeeId?: string;
-  date?: string;
+  date: string;
   eventId?: number;
 }
 
-export async function getEvents(
-  filters: EventFilters = {}
-): Promise<EventsResponse> {
-  const params = new URLSearchParams();
+export async function getEventsLog(
+  params: EventsLogParams
+): Promise<EventsLogResponse> {
+  const searchParams = new URLSearchParams();
 
-  if (filters.employeeId) {
-    params.set("employeeId", filters.employeeId);
+  searchParams.set("date", params.date);
+
+  if (params.employeeId) {
+    searchParams.set("employeeId", params.employeeId);
   }
 
-  if (filters.date) {
-    params.set("date", filters.date);
+  if (params.eventId !== undefined) {
+    searchParams.set("eventId", String(params.eventId));
   }
 
-  if (filters.eventId !== undefined) {
-    params.set("eventId", String(filters.eventId));
-  }
-
-  const query = params.toString();
-
-  return apiClient<EventsResponse>(
-    `/api/v1/events${query ? `?${query}` : ""}`
+  return apiClient<EventsLogResponse>(
+    `/api/v1/daily/events-log?${searchParams.toString()}`
   );
 }

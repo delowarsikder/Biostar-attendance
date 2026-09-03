@@ -1,53 +1,37 @@
 import { apiClient } from "./client";
 
-export interface PunchHistoryItem {
+export interface PunchHistoryRecord {
   punchId: number;
-
   employeeId: string;
   employeeName: string;
-
   dateTime: string;
   time: string;
-
   readerId: number;
   readerName: string;
-
-  direction: "IN" | "OUT" | "UNKNOWN";
-
+  direction: string;
   eventId: number;
 }
 
 export interface PunchHistoryResponse {
   success: boolean;
-
-  data: {
-    employee: {
-      employeeId: string;
-      employeeName: string;
-    };
-
-    date: string;
-
-    totalPunches: number;
-
-    punches: PunchHistoryItem[];
-  };
+  data: PunchHistoryRecord[];
+  message?: string;
 }
 
-export interface PunchHistoryFilters {
+interface PunchHistoryParams {
   employeeId: string;
   date: string;
 }
 
 export async function getPunchHistory(
-  filters: PunchHistoryFilters
+  params: PunchHistoryParams
 ): Promise<PunchHistoryResponse> {
-  const params = new URLSearchParams({
-    employeeId: filters.employeeId,
-    date: filters.date,
-  });
+  const searchParams = new URLSearchParams();
+
+  searchParams.set("employeeId", params.employeeId);
+  searchParams.set("date", params.date);
 
   return apiClient<PunchHistoryResponse>(
-    `/api/v1/punch-history?${params.toString()}`
+    `/api/v1/daily/punch-history?${searchParams.toString()}`
   );
 }

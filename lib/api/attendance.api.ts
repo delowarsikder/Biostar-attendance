@@ -1,52 +1,40 @@
 import { apiClient } from "./client";
 
-export interface AttendanceItem {
+export interface AttendanceRecord {
   employeeId: string;
   employeeName: string;
-
   firstPunch: string | null;
   firstPunchReader: string | null;
-
   lastPunch: string | null;
   lastPunchReader: string | null;
-
   totalPunches: number;
-
   stayTime: string;
-
-  status: string;
+  attendanceStatus: string;
 }
 
 export interface AttendanceResponse {
   success: boolean;
-
-  data: {
-    total: number;
-    attendance: AttendanceItem[];
-  };
+  data: AttendanceRecord[];
+  message?: string;
 }
 
-export interface AttendanceFilters {
-  date?: string;
+interface AttendanceParams {
+  date: string;
   employeeId?: string;
 }
 
 export async function getAttendance(
-  filters: AttendanceFilters = {}
+  params: AttendanceParams
 ): Promise<AttendanceResponse> {
-  const params = new URLSearchParams();
+  const searchParams = new URLSearchParams();
 
-  if (filters.date) {
-    params.set("date", filters.date);
+  searchParams.set("date", params.date);
+
+  if (params.employeeId) {
+    searchParams.set("employeeId", params.employeeId);
   }
-
-  if (filters.employeeId) {
-    params.set("employeeId", filters.employeeId);
-  }
-
-  const query = params.toString();
 
   return apiClient<AttendanceResponse>(
-    `/api/v1/attendance${query ? `?${query}` : ""}`
+    `/api/v1/daily/attendance?${searchParams.toString()}`
   );
 }

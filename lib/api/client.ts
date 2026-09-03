@@ -33,7 +33,7 @@ export async function apiClient<T>(
   try {
     data = await response.json();
   } catch {
-    // Response does not contain JSON.
+    // Response may not contain JSON.
   }
 
   if (!response.ok) {
@@ -45,11 +45,7 @@ export async function apiClient<T>(
         ? data.message
         : `API request failed with status ${response.status}`;
 
-    throw new ApiError(
-      message,
-      response.status,
-      data
-    );
+    throw new ApiError(message, response.status, data);
   }
 
   return data as T;
