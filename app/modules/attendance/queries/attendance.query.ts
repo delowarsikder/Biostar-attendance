@@ -25,7 +25,11 @@ WITH Punches AS
 
         U.sUserID AS EmployeeID,
 
-        U.sUserName AS EmployeeName
+        U.sUserName AS EmployeeName,
+
+        U.nDepartmentIdn AS DepartmentID,
+
+        D.sName AS DepartmentName
 
     FROM TB_EVENT_LOG E
 
@@ -35,20 +39,28 @@ WITH Punches AS
     LEFT JOIN TB_READER R
         ON E.nReaderIdn = R.nReaderIdn
 
+    LEFT JOIN TB_USER_DEPT D
+        ON D.nDepartmentIdn = U.nDepartmentIdn
+
     WHERE E.nEventIdn = ${BIOSTAR_IDENTIFY_SUCCESS_EVENT}
 
       AND E.nReaderIdn IN (${readerList})
 
-      AND (@date IS NULL OR
-           CAST(
-               DATEADD(
-                   SECOND,
-                   E.nDateTime,
-                   '1970-01-01'
-               ) AS DATE
-           ) = @date)
+      AND (
+          @date IS NULL
+          OR CAST(
+              DATEADD(
+                  SECOND,
+                  E.nDateTime,
+                  '1970-01-01'
+              ) AS DATE
+          ) = @date
+      )
 
-      AND (@employeeId IS NULL OR U.sUserID = @employeeId)
+      AND (
+          @employeeId IS NULL
+          OR U.sUserID = @employeeId
+      )
 
       AND (
           @search IS NULL
@@ -64,14 +76,24 @@ RankedPunches AS
 
         ROW_NUMBER() OVER
         (
-            PARTITION BY EmployeeID, CAST(EventDateTime AS DATE)
-            ORDER BY EventDateTime ASC, nEventLogIdn ASC
+            PARTITION BY
+                EmployeeID,
+                CAST(EventDateTime AS DATE)
+
+            ORDER BY
+                EventDateTime ASC,
+                nEventLogIdn ASC
         ) AS FirstPunchRank,
 
         ROW_NUMBER() OVER
         (
-            PARTITION BY EmployeeID, CAST(EventDateTime AS DATE)
-            ORDER BY EventDateTime DESC, nEventLogIdn DESC
+            PARTITION BY
+                EmployeeID,
+                CAST(EventDateTime AS DATE)
+
+            ORDER BY
+                EventDateTime DESC,
+                nEventLogIdn DESC
         ) AS LastPunchRank
 
     FROM Punches
@@ -82,6 +104,9 @@ DailyAttendance AS
     SELECT
         EmployeeID,
         EmployeeName,
+
+        DepartmentID,
+        DepartmentName,
 
         CAST(EventDateTime AS DATE) AS AttendanceDate,
 
@@ -96,6 +121,10 @@ DailyAttendance AS
     GROUP BY
         EmployeeID,
         EmployeeName,
+
+        DepartmentID,
+        DepartmentName,
+
         CAST(EventDateTime AS DATE)
 ),
 
@@ -104,6 +133,10 @@ Result AS
     SELECT
         A.EmployeeID,
         A.EmployeeName,
+
+        A.DepartmentID,
+        A.DepartmentName,
+
         A.AttendanceDate,
 
         A.FirstPunch,
@@ -136,13 +169,29 @@ Result AS
 SELECT
     EmployeeID,
     EmployeeName,
-    CONVERT(VARCHAR(10), AttendanceDate, 23) AS AttendanceDate,
 
-    CONVERT(VARCHAR(19), FirstPunch, 120) AS FirstPunch,
+    DepartmentID,
+    DepartmentName,
+
+    CONVERT(
+        VARCHAR(10),
+        AttendanceDate,
+        23
+    ) AS AttendanceDate,
+
+    CONVERT(
+        VARCHAR(19),
+        FirstPunch,
+        120
+    ) AS FirstPunch,
 
     FirstPunchReader,
 
-    CONVERT(VARCHAR(19), LastPunch, 120) AS LastPunch,
+    CONVERT(
+        VARCHAR(19),
+        LastPunch,
+        120
+    ) AS LastPunch,
 
     LastPunchReader,
 
@@ -169,6 +218,7 @@ FROM
 (
     SELECT
         U.sUserID,
+
         CAST(
             DATEADD(
                 SECOND,
@@ -182,20 +232,28 @@ FROM
     INNER JOIN TB_USER U
         ON CAST(E.nUserID AS VARCHAR(64)) = U.sUserID
 
+    LEFT JOIN TB_USER_DEPT D
+        ON D.nDepartmentIdn = U.nDepartmentIdn
+
     WHERE E.nEventIdn = ${BIOSTAR_IDENTIFY_SUCCESS_EVENT}
 
       AND E.nReaderIdn IN (${readerList})
 
-      AND (@date IS NULL OR
-           CAST(
-               DATEADD(
-                   SECOND,
-                   E.nDateTime,
-                   '1970-01-01'
-               ) AS DATE
-           ) = @date)
+      AND (
+          @date IS NULL
+          OR CAST(
+              DATEADD(
+                  SECOND,
+                  E.nDateTime,
+                  '1970-01-01'
+              ) AS DATE
+          ) = @date
+      )
 
-      AND (@employeeId IS NULL OR U.sUserID = @employeeId)
+      AND (
+          @employeeId IS NULL
+          OR U.sUserID = @employeeId
+      )
 
       AND (
           @search IS NULL
@@ -205,6 +263,7 @@ FROM
 
     GROUP BY
         U.sUserID,
+
         CAST(
             DATEADD(
                 SECOND,

@@ -16,6 +16,9 @@ interface AttendanceQueryRow {
   EmployeeID: string | number;
   EmployeeName: string | null;
 
+  DepartmentID: string | number | null;
+  DepartmentName: string | null;
+
   AttendanceDate: Date | string | null;
 
   FirstPunch: Date | string | null;
@@ -92,13 +95,13 @@ export class AttendanceRepository {
     `);
 
     /*
-     * request.batch() returns a union type for recordsets.
+     * request.batch() returns multiple recordsets.
      *
-     * We know that our batch contains exactly two
-     * result sets:
+     * Recordset 1:
+     * Daily attendance records
      *
-     * 1. Attendance records
-     * 2. Attendance count
+     * Recordset 2:
+     * Total attendance count
      */
     const recordsets =
       result.recordsets as unknown as [
@@ -123,6 +126,15 @@ export class AttendanceRepository {
 
         employeeName:
           row.EmployeeName ?? "Unknown",
+
+        departmentId:
+          row.DepartmentID !== null &&
+          row.DepartmentID !== undefined
+            ? Number(row.DepartmentID)
+            : null,
+
+        departmentName:
+          row.DepartmentName ?? null,
 
         attendanceDate:
           this.formatDateTime(
@@ -164,10 +176,8 @@ export class AttendanceRepository {
   }
 
   /**
-   * Converts SQL date/time values to strings.
-   *
-   * SQL Server can return Date objects, strings,
-   * or null depending on the query and driver.
+   * Converts SQL date/time values
+   * to strings.
    */
   private formatDateTime(
     value: Date | string | null
@@ -178,7 +188,7 @@ export class AttendanceRepository {
   }
 
   /**
-   * Converts seconds into HH:mm:ss format.
+   * Converts seconds into HH:mm:ss.
    */
   private formatDuration(
     totalSeconds: number
@@ -209,3 +219,4 @@ export class AttendanceRepository {
 
 export const attendanceRepository =
   new AttendanceRepository();
+  

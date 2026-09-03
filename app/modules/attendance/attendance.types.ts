@@ -2,6 +2,7 @@ export interface AttendanceFilters {
   date?: string;
   employeeId?: string;
   search?: string;
+
   page: number;
   pageSize: number;
 }
@@ -9,28 +10,21 @@ export interface AttendanceFilters {
 export interface AttendanceRecord {
   employeeId: string;
   employeeName: string;
+
+  departmentId: number | null;
+  departmentName: string | null;
+
   attendanceDate: string;
 
   firstPunch: string;
-  firstPunchReader: string | null;
+  firstPunchReader: string;
 
   lastPunch: string;
-  lastPunchReader: string | null;
+  lastPunchReader: string;
 
   totalPunches: number;
 
   stayTime: string;
 
-  attendanceStatus: "Present";
-}
-
-export interface AttendanceResponse {
-  data: AttendanceRecord[];
-
-  pagination: {
-    page: number;
-    pageSize: number;
-    total: number;
-    totalPages: number;
-  };
+  attendanceStatus: string;
 }

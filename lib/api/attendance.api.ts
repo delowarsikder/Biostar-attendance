@@ -3,6 +3,8 @@ import { apiClient } from "./client";
 export interface AttendanceRecord {
   employeeId: string;
   employeeName: string;
+  departmentName: string | null;
+  attendanceDate: string;
   firstPunch: string | null;
   firstPunchReader: string | null;
   lastPunch: string | null;

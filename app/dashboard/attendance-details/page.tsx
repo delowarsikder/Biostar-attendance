@@ -4,11 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
   Clock3,
+  Filter,
   RefreshCw,
   Search,
-  Users,
   UserX,
+  Users,
   X,
 } from "lucide-react";
 
@@ -33,9 +35,6 @@ function formatPunch(value: string | null) {
     return "—";
   }
 
-  // API returns SQL datetime as a string.
-  // Do not use new Date() here because that can introduce
-  // browser timezone conversion.
   return value.length >= 19 ? value.substring(11, 19) : value;
 }
 
@@ -56,6 +55,9 @@ function getStatusClasses(status: string | null | undefined) {
 export default function AttendanceDetailsPage() {
   const [date, setDate] = useState(getToday);
   const [search, setSearch] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [readerFilter, setReaderFilter] = useState("all");
 
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,51 +98,136 @@ export default function AttendanceDetailsPage() {
     loadAttendance();
   }, [loadAttendance]);
 
+  /*
+   * Unique departments from current day's records.
+   */
+  const departmentOptions = useMemo(() => {
+    const departments = new Set<string>();
+
+    records.forEach((record) => {
+      if (record.departmentName) {
+        departments.add(record.departmentName);
+      }
+    });
+
+    return Array.from(departments).sort((a, b) =>
+      a.localeCompare(b)
+    );
+  }, [records]);
+
+  /*
+   * Unique readers from first and last punch readers.
+   */
+  const readerOptions = useMemo(() => {
+    const readers = new Set<string>();
+
+    records.forEach((record) => {
+      if (record.firstPunchReader) {
+        readers.add(record.firstPunchReader);
+      }
+
+      if (record.lastPunchReader) {
+        readers.add(record.lastPunchReader);
+      }
+    });
+
+    return Array.from(readers).sort((a, b) =>
+      a.localeCompare(b)
+    );
+  }, [records]);
+
+  /*
+   * Apply all client-side filters.
+   */
   const filteredRecords = useMemo(() => {
     const query = search.trim().toLowerCase();
 
-    if (!query) {
-      return records;
-    }
-
     return records.filter((record) => {
+      const employeeId = String(record.employeeId ?? "");
+      const employeeName = String(record.employeeName ?? "");
+      const department = String(record.departmentName ?? "");
+      const status = String(
+        record.attendanceStatus ?? ""
+      ).toLowerCase();
+
+      const matchesEmployee =
+        !query ||
+        employeeId.toLowerCase().includes(query) ||
+        employeeName.toLowerCase().includes(query);
+
+      const matchesDepartment =
+        departmentFilter === "all" ||
+        department === departmentFilter;
+
+      const matchesStatus =
+        statusFilter === "all" ||
+        status === statusFilter;
+
+      const matchesReader =
+        readerFilter === "all" ||
+        record.firstPunchReader === readerFilter ||
+        record.lastPunchReader === readerFilter;
+
       return (
-        record.employeeName.toLowerCase().includes(query) ||
-        record.employeeId.toLowerCase().includes(query)
+        matchesEmployee &&
+        matchesDepartment &&
+        matchesStatus &&
+        matchesReader
       );
     });
-  }, [records, search]);
+  }, [
+    records,
+    search,
+    departmentFilter,
+    statusFilter,
+    readerFilter,
+  ]);
 
+  /*
+   * Daily summary statistics.
+   */
   const totalEmployees = records.length;
 
   const presentCount = records.filter(
     (record) =>
-      String(record.attendanceStatus ?? "").toLowerCase() === "present"
+      String(record.attendanceStatus ?? "").toLowerCase() ===
+      "present"
   ).length;
 
   const absentCount = records.filter(
     (record) =>
-      String(record.attendanceStatus ?? "").toLowerCase() === "absent"
+      String(record.attendanceStatus ?? "").toLowerCase() ===
+      "absent"
   ).length;
 
   const totalPunches = records.reduce(
-    (total, record) => total + Number(record.totalPunches || 0),
+    (total, record) =>
+      total + Number(record.totalPunches || 0),
     0
   );
+
+  const hasActiveFilters =
+    search.trim() !== "" ||
+    departmentFilter !== "all" ||
+    statusFilter !== "all" ||
+    readerFilter !== "all";
+
+  const clearFilters = () => {
+    setSearch("");
+    setDepartmentFilter("all");
+    setStatusFilter("all");
+    setReaderFilter("all");
+  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
     await loadAttendance();
   };
 
-  const clearSearch = () => {
-    setSearch("");
-  };
-
   return (
     <DashboardShell>
       <div className="space-y-6">
-        {/* Page header */}
+        {/* Page Header */}
         <section className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
@@ -159,8 +246,9 @@ export default function AttendanceDetailsPage() {
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
           >
             <RefreshCw
-              className={`h-4 w-4 ${refreshing ? "animate-spin" : ""
-                }`}
+              className={`h-4 w-4 ${
+                refreshing ? "animate-spin" : ""
+              }`}
             />
 
             {refreshing ? "Refreshing..." : "Refresh"}
@@ -168,9 +256,31 @@ export default function AttendanceDetailsPage() {
         </section>
 
         {/* Filters */}
-        <section className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
-          <div className="grid gap-4 md:grid-cols-2">
-            {/* Date */}
+        <section className="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-slate-500" />
+
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+                Filters
+              </h2>
+            </div>
+
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-900 dark:hover:text-white"
+              >
+                <X className="h-3.5 w-3.5" />
+                Clear filters
+              </button>
+            )}
+          </div>
+
+          {/* All filters in one row on large screens */}
+          <div className="grid gap-4 p-5 lg:grid-cols-[1.1fr_1.4fr_1.2fr_1fr_1.4fr_auto] lg:items-end">
+            {/* Attendance Date */}
             <div>
               <label
                 htmlFor="attendance-date"
@@ -186,19 +296,21 @@ export default function AttendanceDetailsPage() {
                   id="attendance-date"
                   type="date"
                   value={date}
-                  onChange={(event) => setDate(event.target.value)}
+                  onChange={(event) =>
+                    setDate(event.target.value)
+                  }
                   className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-slate-600 dark:focus:ring-slate-800"
                 />
               </div>
             </div>
 
-            {/* Employee search */}
+            {/* Employee */}
             <div>
               <label
                 htmlFor="employee-search"
                 className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300"
               >
-                Search Employee
+                Employee
               </label>
 
               <div className="relative">
@@ -208,27 +320,154 @@ export default function AttendanceDetailsPage() {
                   id="employee-search"
                   type="text"
                   value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search by employee ID or name..."
+                  onChange={(event) =>
+                    setSearch(event.target.value)
+                  }
+                  placeholder="ID or employee name..."
                   className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-10 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-slate-600 dark:focus:ring-slate-800"
                 />
 
                 {search && (
                   <button
                     type="button"
-                    onClick={clearSearch}
+                    onClick={() => setSearch("")}
                     className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                    aria-label="Clear search"
+                    aria-label="Clear employee search"
                   >
                     <X className="h-4 w-4" />
                   </button>
                 )}
               </div>
             </div>
+
+            {/* Department */}
+            <div>
+              <label
+                htmlFor="department-filter"
+                className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300"
+              >
+                Department
+              </label>
+
+              <div className="relative">
+                <select
+                  id="department-filter"
+                  value={departmentFilter}
+                  onChange={(event) =>
+                    setDepartmentFilter(event.target.value)
+                  }
+                  className="h-10 w-full appearance-none rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-slate-600 dark:focus:ring-slate-800"
+                >
+                  <option value="all">
+                    All Departments
+                  </option>
+
+                  {departmentOptions.map((department) => (
+                    <option
+                      key={department}
+                      value={department}
+                    >
+                      {department}
+                    </option>
+                  ))}
+                </select>
+
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              </div>
+            </div>
+
+            {/* Status */}
+            <div>
+              <label
+                htmlFor="status-filter"
+                className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300"
+              >
+                Status
+              </label>
+
+              <div className="relative">
+                <select
+                  id="status-filter"
+                  value={statusFilter}
+                  onChange={(event) =>
+                    setStatusFilter(event.target.value)
+                  }
+                  className="h-10 w-full appearance-none rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-slate-600 dark:focus:ring-slate-800"
+                >
+                  <option value="all">All Status</option>
+                  <option value="present">Present</option>
+                  <option value="absent">Absent</option>
+                </select>
+
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              </div>
+            </div>
+
+            {/* Reader */}
+            <div>
+              <label
+                htmlFor="reader-filter"
+                className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300"
+              >
+                Reader
+              </label>
+
+              <div className="relative">
+                <select
+                  id="reader-filter"
+                  value={readerFilter}
+                  onChange={(event) =>
+                    setReaderFilter(event.target.value)
+                  }
+                  className="h-10 w-full appearance-none rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-slate-600 dark:focus:ring-slate-800"
+                >
+                  <option value="all">All Readers</option>
+
+                  {readerOptions.map((reader) => (
+                    <option
+                      key={reader}
+                      value={reader}
+                    >
+                      {reader}
+                    </option>
+                  ))}
+                </select>
+
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              </div>
+            </div>
+
+            {/* Clear */}
+            <div>
+              <button
+                type="button"
+                onClick={clearFilters}
+                disabled={!hasActiveFilters}
+                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                <X className="h-4 w-4" />
+                Clear
+              </button>
+            </div>
+          </div>
+
+          {/* Result count */}
+          <div className="border-t border-slate-200 bg-slate-50 px-5 py-3 dark:border-slate-800 dark:bg-slate-900/40">
+            <p className="text-xs text-slate-500">
+              Showing{" "}
+              <span className="font-semibold text-slate-700 dark:text-slate-300">
+                {filteredRecords.length}
+              </span>{" "}
+              of{" "}
+              <span className="font-semibold text-slate-700 dark:text-slate-300">
+                {records.length}
+              </span>{" "}
+              employees
+            </p>
           </div>
         </section>
 
-        {/* Summary cards */}
+        {/* Summary */}
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <SummaryCard
             title="Total Employees"
@@ -263,9 +502,7 @@ export default function AttendanceDetailsPage() {
         {error && (
           <section className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/20">
             <div className="flex items-start gap-3">
-              <div className="mt-0.5">
-                <X className="h-5 w-5 text-red-600 dark:text-red-400" />
-              </div>
+              <X className="mt-0.5 h-5 w-5 text-red-600 dark:text-red-400" />
 
               <div>
                 <h2 className="text-sm font-semibold text-red-800 dark:text-red-300">
@@ -280,7 +517,7 @@ export default function AttendanceDetailsPage() {
           </section>
         )}
 
-        {/* Attendance table */}
+        {/* Attendance Table */}
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
           <div className="flex flex-col gap-1 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
             <div>
@@ -289,11 +526,10 @@ export default function AttendanceDetailsPage() {
               </h2>
 
               <p className="text-xs text-slate-500">
-                {search
-                  ? `${filteredRecords.length} matching employee${filteredRecords.length === 1 ? "" : "s"
-                  }`
-                  : `${records.length} employee${records.length === 1 ? "" : "s"
-                  }`}
+                {filteredRecords.length}{" "}
+                {filteredRecords.length === 1
+                  ? "employee"
+                  : "employees"}
               </p>
             </div>
 
@@ -305,43 +541,25 @@ export default function AttendanceDetailsPage() {
           {loading ? (
             <LoadingTable />
           ) : filteredRecords.length === 0 ? (
-            <EmptyState search={Boolean(search)} />
+            <EmptyState
+              hasFilters={hasActiveFilters}
+              onClear={clearFilters}
+            />
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1100px] text-left">
+              <table className="w-full min-w-[1350px] text-left">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50">
-                    <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Employee
-                    </th>
-
-                    <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      First Punch
-                    </th>
-
-                    <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      First Punch Reader
-                    </th>
-
-                    <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Last Punch
-                    </th>
-
-                    <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Last Punch Reader
-                    </th>
-
-                    <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Punches
-                    </th>
-
-                    <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Stay Time
-                    </th>
-
-                    <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Status
-                    </th>
+                    <TableHeader>ID</TableHeader>
+                    <TableHeader>Employee</TableHeader>
+                    <TableHeader>Department</TableHeader>
+                    <TableHeader>First Punch</TableHeader>
+                    <TableHeader>First Punch Reader</TableHeader>
+                    <TableHeader>Last Punch</TableHeader>
+                    <TableHeader>Last Punch Reader</TableHeader>
+                    <TableHeader>Punches</TableHeader>
+                    <TableHeader>Stay Time</TableHeader>
+                    <TableHeader>Status</TableHeader>
                   </tr>
                 </thead>
 
@@ -359,6 +577,18 @@ export default function AttendanceDetailsPage() {
         </section>
       </div>
     </DashboardShell>
+  );
+}
+
+function TableHeader({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <th className="whitespace-nowrap px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+      {children}
+    </th>
   );
 }
 
@@ -409,53 +639,75 @@ function AttendanceRow({
 }) {
   return (
     <tr className="transition hover:bg-slate-50 dark:hover:bg-slate-900/50">
-      <td className="px-5 py-4">
-        <div>
-          <p className="text-sm font-medium text-slate-900 dark:text-white">
-            {record.employeeName}
-          </p>
-
-          <p className="mt-0.5 text-xs text-slate-500">
-            ID: {record.employeeId}
-          </p>
-        </div>
+      {/* ID */}
+      <td className="whitespace-nowrap px-5 py-4">
+        <span className="font-mono text-sm font-medium text-slate-700 dark:text-slate-300">
+          {record.employeeId}
+        </span>
       </td>
 
+      {/* Employee */}
       <td className="px-5 py-4">
-        <span className="font-mono text-sm text-slate-700 dark:text-slate-300">
+        <p className="whitespace-nowrap text-sm font-medium text-slate-900 dark:text-white">
+          {record.employeeName}
+        </p>
+      </td>
+
+      {/* Department */}
+      <td className="px-5 py-4">
+        <span className="whitespace-nowrap text-sm text-slate-600 dark:text-slate-400">
+          {record.departmentName || "—"}
+        </span>
+      </td>
+
+      {/* First Punch */}
+      <td className="px-5 py-4">
+        <span className="whitespace-nowrap font-mono text-sm text-slate-700 dark:text-slate-300">
           {formatPunch(record.firstPunch)}
         </span>
       </td>
 
-      <td className="px-5 py-4 text-sm text-slate-600 dark:text-slate-400">
-        {record.firstPunchReader || "—"}
+      {/* First Punch Reader */}
+      <td className="px-5 py-4">
+        <span className="whitespace-nowrap text-sm text-slate-600 dark:text-slate-400">
+          {record.firstPunchReader || "—"}
+        </span>
       </td>
 
+      {/* Last Punch */}
       <td className="px-5 py-4">
-        <span className="font-mono text-sm text-slate-700 dark:text-slate-300">
+        <span className="whitespace-nowrap font-mono text-sm text-slate-700 dark:text-slate-300">
           {formatPunch(record.lastPunch)}
         </span>
       </td>
 
-      <td className="px-5 py-4 text-sm text-slate-600 dark:text-slate-400">
-        {record.lastPunchReader || "—"}
+      {/* Last Punch Reader */}
+      <td className="px-5 py-4">
+        <span className="whitespace-nowrap text-sm text-slate-600 dark:text-slate-400">
+          {record.lastPunchReader || "—"}
+        </span>
       </td>
 
+      {/* Punches */}
       <td className="px-5 py-4">
         <span className="inline-flex min-w-8 items-center justify-center rounded-md bg-slate-100 px-2 py-1 text-sm font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
           {record.totalPunches}
         </span>
       </td>
 
+      {/* Stay Time */}
       <td className="px-5 py-4">
-        <span className="font-mono text-sm text-slate-700 dark:text-slate-300">
+        <span className="whitespace-nowrap font-mono text-sm text-slate-700 dark:text-slate-300">
           {record.stayTime || "00:00:00"}
         </span>
       </td>
 
+      {/* Status */}
       <td className="px-5 py-4">
         <span
-          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusClasses(record.attendanceStatus)}`}
+          className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusClasses(
+            record.attendanceStatus
+          )}`}
         >
           {record.attendanceStatus || "Unknown"}
         </span>
@@ -471,14 +723,16 @@ function LoadingTable() {
         {Array.from({ length: 7 }).map((_, index) => (
           <div
             key={index}
-            className="grid grid-cols-8 gap-4"
+            className="grid grid-cols-10 gap-4"
           >
-            {Array.from({ length: 8 }).map((__, cellIndex) => (
-              <div
-                key={cellIndex}
-                className="h-10 animate-pulse rounded-md bg-slate-100 dark:bg-slate-800"
-              />
-            ))}
+            {Array.from({ length: 10 }).map(
+              (__, cellIndex) => (
+                <div
+                  key={cellIndex}
+                  className="h-10 animate-pulse rounded-md bg-slate-100 dark:bg-slate-800"
+                />
+              )
+            )}
           </div>
         ))}
       </div>
@@ -486,28 +740,41 @@ function LoadingTable() {
   );
 }
 
-function EmptyState({ search }: { search: boolean }) {
+function EmptyState({
+  hasFilters,
+  onClear,
+}: {
+  hasFilters: boolean;
+  onClear: () => void;
+}) {
   return (
     <div className="flex min-h-[280px] flex-col items-center justify-center px-6 text-center">
       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
-        {search ? (
-          <Search className="h-5 w-5 text-slate-400" />
-        ) : (
-          <CalendarDays className="h-5 w-5 text-slate-400" />
-        )}
+        <Search className="h-5 w-5 text-slate-400" />
       </div>
 
       <h3 className="mt-4 text-sm font-semibold text-slate-900 dark:text-white">
-        {search
-          ? "No employees found"
+        {hasFilters
+          ? "No matching employees"
           : "No attendance records"}
       </h3>
 
       <p className="mt-1 max-w-md text-sm text-slate-500">
-        {search
-          ? "Try a different employee ID or name."
+        {hasFilters
+          ? "Try changing your search or filter criteria."
           : "There are no attendance records for the selected date."}
       </p>
+
+      {hasFilters && (
+        <button
+          type="button"
+          onClick={onClear}
+          className="mt-4 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+        >
+          <X className="h-3.5 w-3.5" />
+          Clear filters
+        </button>
+      )}
     </div>
   );
 }
