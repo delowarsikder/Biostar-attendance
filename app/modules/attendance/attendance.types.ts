@@ -1,12 +1,3 @@
-export interface AttendanceFilters {
-  date?: string;
-  employeeId?: string;
-  search?: string;
-
-  page: number;
-  pageSize: number;
-}
-
 export interface AttendanceRecord {
   employeeId: string;
   employeeName: string;
@@ -26,5 +17,35 @@ export interface AttendanceRecord {
 
   stayTime: string;
 
+  hasAttendance: boolean;
+  isPresent: boolean;
+  isLate: boolean;
+  isEarlyOut: boolean;
+
   attendanceStatus: string;
+}
+
+export interface AttendanceSummary {
+  totalEmployees: number;
+  present: number;
+  noAttendance: number;
+  late: number;
+  earlyOut: number;
+}
+
+export interface AttendancePagination {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface AttendanceResponse {
+  success: boolean;
+
+  data: AttendanceRecord[];
+
+  summary: AttendanceSummary;
+
+  pagination: AttendancePagination;
 }

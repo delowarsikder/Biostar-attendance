@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Clock3,
+  ClockAlert,
   Filter,
   RefreshCw,
   Search,
@@ -17,6 +18,8 @@ import {
 import DashboardShell from "@/components/dashboard-v1/layout/dashboard-shell";
 import {
   AttendanceRecord,
+  AttendanceSummary,
+  AttendancePagination,
   getAttendance,
 } from "@/lib/api/attendance.api";
 
@@ -60,6 +63,22 @@ export default function AttendanceDetailsPage() {
   const [readerFilter, setReaderFilter] = useState("all");
 
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [summary, setSummary] = useState<AttendanceSummary>({
+    totalEmployees: 0,
+    present: 0,
+    noAttendance: 0,
+    late: 0,
+    earlyOut: 0,
+  });
+  const [pagination, setPagination] = useState<AttendancePagination>({
+    page: 1,
+    pageSize: 25,
+    total: 0,
+    totalPages: 0,
+  });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,15 +89,37 @@ export default function AttendanceDetailsPage() {
 
       const response = await getAttendance({
         date,
+        page: currentPage,
+        pageSize,
       });
 
       if (!response.success) {
         throw new Error(
-          response.message || "Unable to load attendance data."
+          response.message ||
+          "Unable to load attendance data."
         );
       }
 
       setRecords(response.data ?? []);
+
+      setSummary(
+        response.summary ?? {
+          totalEmployees: 0,
+          present: 0,
+          noAttendance: 0,
+          late: 0,
+          earlyOut: 0,
+        }
+      );
+
+      setPagination(
+        response.pagination ?? {
+          page: currentPage,
+          pageSize,
+          total: 0,
+          totalPages: 0,
+        }
+      );
     } catch (err) {
       const message =
         err instanceof Error
@@ -91,7 +132,7 @@ export default function AttendanceDetailsPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [date]);
+  }, [date, currentPage, pageSize]);
 
   useEffect(() => {
     setLoading(true);
@@ -150,6 +191,13 @@ export default function AttendanceDetailsPage() {
         record.attendanceStatus ?? ""
       ).toLowerCase();
 
+      const matchesStatus =
+        statusFilter === "all" ||
+        (statusFilter === "present" && record.isPresent) ||
+        (statusFilter === "no_attendance" && !record.hasAttendance) ||
+        (statusFilter === "late" && record.isLate) ||
+        (statusFilter === "early_out" && record.isEarlyOut);
+
       const matchesEmployee =
         !query ||
         employeeId.toLowerCase().includes(query) ||
@@ -158,10 +206,6 @@ export default function AttendanceDetailsPage() {
       const matchesDepartment =
         departmentFilter === "all" ||
         department === departmentFilter;
-
-      const matchesStatus =
-        statusFilter === "all" ||
-        status === statusFilter;
 
       const matchesReader =
         readerFilter === "all" ||
@@ -184,27 +228,17 @@ export default function AttendanceDetailsPage() {
   ]);
 
   /*
-   * Daily summary statistics.
+   * Daily summary comes from the backend.
+   *
+   * Do not calculate these values from the current page because
+   * the API is paginated. Late and Early Out are independent
+   * flags and may overlap with Present.
    */
-  const totalEmployees = records.length;
-
-  const presentCount = records.filter(
-    (record) =>
-      String(record.attendanceStatus ?? "").toLowerCase() ===
-      "present"
-  ).length;
-
-  const absentCount = records.filter(
-    (record) =>
-      String(record.attendanceStatus ?? "").toLowerCase() ===
-      "absent"
-  ).length;
-
-  const totalPunches = records.reduce(
-    (total, record) =>
-      total + Number(record.totalPunches || 0),
-    0
-  );
+  const totalEmployees = summary.totalEmployees;
+  const presentCount = summary.present;
+  const absentCount = summary.noAttendance;
+  const lateCount = summary.late;
+  const earlyOutCount = summary.earlyOut;
 
   const hasActiveFilters =
     search.trim() !== "" ||
@@ -230,7 +264,7 @@ export default function AttendanceDetailsPage() {
         {/* Page Header */}
         <section className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
               Attendance Details
             </h1>
 
@@ -246,9 +280,8 @@ export default function AttendanceDetailsPage() {
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
           >
             <RefreshCw
-              className={`h-4 w-4 ${
-                refreshing ? "animate-spin" : ""
-              }`}
+              className={`h-4 w-4 ${refreshing ? "animate-spin" : ""
+                }`}
             />
 
             {refreshing ? "Refreshing..." : "Refresh"}
@@ -257,7 +290,7 @@ export default function AttendanceDetailsPage() {
 
         {/* Filters */}
         <section className="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-2 dark:border-slate-800">
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-slate-500" />
 
@@ -279,8 +312,7 @@ export default function AttendanceDetailsPage() {
           </div>
 
           {/* All filters in one row on large screens */}
-          <div className="grid gap-4 p-5 lg:grid-cols-[1.1fr_1.4fr_1.2fr_1fr_1.4fr_auto] lg:items-end">
-            {/* Attendance Date */}
+          <div className="grid gap-4 p-2 lg:grid-cols-[1.1fr_1.4fr_1.2fr_1fr_1.4fr_auto] lg:items-end">
             <div>
               <label
                 htmlFor="attendance-date"
@@ -291,16 +323,17 @@ export default function AttendanceDetailsPage() {
 
               <div className="relative">
                 <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
                 <input
                   id="attendance-date"
                   type="date"
                   value={date}
-                  onChange={(event) =>
-                    setDate(event.target.value)
-                  }
+                  onChange={(event) => {
+                    setDate(event.target.value);
+                    setCurrentPage(1);
+                  }}
                   className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-slate-600 dark:focus:ring-slate-800"
                 />
+
               </div>
             </div>
 
@@ -396,7 +429,9 @@ export default function AttendanceDetailsPage() {
                 >
                   <option value="all">All Status</option>
                   <option value="present">Present</option>
-                  <option value="absent">Absent</option>
+                  <option value="no_attendance">No Attendance</option>
+                  <option value="late">Late</option>
+                  <option value="early_out">Early Out</option>
                 </select>
 
                 <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -452,7 +487,7 @@ export default function AttendanceDetailsPage() {
           </div>
 
           {/* Result count */}
-          <div className="border-t border-slate-200 bg-slate-50 px-5 py-3 dark:border-slate-800 dark:bg-slate-900/40">
+          <div className="border-t border-slate-200 bg-slate-50 px-5 py-2 dark:border-slate-800 dark:bg-slate-900/40">
             <p className="text-xs text-slate-500">
               Showing{" "}
               <span className="font-semibold text-slate-700 dark:text-slate-300">
@@ -460,7 +495,7 @@ export default function AttendanceDetailsPage() {
               </span>{" "}
               of{" "}
               <span className="font-semibold text-slate-700 dark:text-slate-300">
-                {records.length}
+                {pagination.total}
               </span>{" "}
               employees
             </p>
@@ -468,7 +503,7 @@ export default function AttendanceDetailsPage() {
         </section>
 
         {/* Summary */}
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <SummaryCard
             title="Total Employees"
             value={totalEmployees}
@@ -484,16 +519,23 @@ export default function AttendanceDetailsPage() {
           />
 
           <SummaryCard
-            title="Absent"
+            title="No Attendance"
             value={absentCount}
-            description="No valid attendance punch"
+            description="Employees without attendance"
             icon={UserX}
           />
 
           <SummaryCard
-            title="Total Punches"
-            value={totalPunches}
-            description="Valid attendance punches"
+            title="Late"
+            value={lateCount}
+            description="Independent late flag"
+            icon={ClockAlert}
+          />
+
+          <SummaryCard
+            title="Early Out"
+            value={earlyOutCount}
+            description="Independent early-out flag"
             icon={Clock3}
           />
         </section>
@@ -519,7 +561,7 @@ export default function AttendanceDetailsPage() {
 
         {/* Attendance Table */}
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-          <div className="flex flex-col gap-1 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
+          <div className="flex flex-col gap-1 border-b border-slate-200 px-5 py-2 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
             <div>
               <h2 className="font-semibold text-slate-900 dark:text-white">
                 Daily Attendance
@@ -550,6 +592,7 @@ export default function AttendanceDetailsPage() {
               <table className="w-full min-w-[1350px] text-left">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50">
+                    <TableHeader>SL No.</TableHeader>
                     <TableHeader>ID</TableHeader>
                     <TableHeader>Employee</TableHeader>
                     <TableHeader>Department</TableHeader>
@@ -568,6 +611,8 @@ export default function AttendanceDetailsPage() {
                     <AttendanceRow
                       key={record.employeeId}
                       record={record}
+                      serialNumber={filteredRecords.indexOf(record) + 1}
+
                     />
                   ))}
                 </tbody>
@@ -586,7 +631,7 @@ function TableHeader({
   children: React.ReactNode;
 }) {
   return (
-    <th className="whitespace-nowrap px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+    <th className="whitespace-nowrap px-5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
       {children}
     </th>
   );
@@ -608,7 +653,7 @@ function SummaryCard({
   icon: Icon,
 }: SummaryCardProps) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
+    <div className="rounded-xl border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-950">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm font-medium text-slate-500">
@@ -634,83 +679,108 @@ function SummaryCard({
 
 function AttendanceRow({
   record,
+  serialNumber,
 }: {
   record: AttendanceRecord;
+  serialNumber: number;
 }) {
   return (
     <tr className="transition hover:bg-slate-50 dark:hover:bg-slate-900/50">
+      {/* Serial Number */}
+      <td className="whitespace-nowrap px-5 py-2">
+        <span className="font-mono text-sm font-medium text-slate-700 dark:text-slate-300">
+          {serialNumber}
+        </span>
+      </td>
+
       {/* ID */}
-      <td className="whitespace-nowrap px-5 py-4">
+      <td className="whitespace-nowrap px-5 py-2">
         <span className="font-mono text-sm font-medium text-slate-700 dark:text-slate-300">
           {record.employeeId}
         </span>
       </td>
 
       {/* Employee */}
-      <td className="px-5 py-4">
+      <td className="px-5 py-2">
         <p className="whitespace-nowrap text-sm font-medium text-slate-900 dark:text-white">
           {record.employeeName}
         </p>
       </td>
 
       {/* Department */}
-      <td className="px-5 py-4">
+      <td className="px-5 py-2">
         <span className="whitespace-nowrap text-sm text-slate-600 dark:text-slate-400">
           {record.departmentName || "—"}
         </span>
       </td>
 
       {/* First Punch */}
-      <td className="px-5 py-4">
+      <td className="px-5 py-2">
         <span className="whitespace-nowrap font-mono text-sm text-slate-700 dark:text-slate-300">
           {formatPunch(record.firstPunch)}
         </span>
       </td>
 
       {/* First Punch Reader */}
-      <td className="px-5 py-4">
+      <td className="px-5 py-2">
         <span className="whitespace-nowrap text-sm text-slate-600 dark:text-slate-400">
           {record.firstPunchReader || "—"}
         </span>
       </td>
 
       {/* Last Punch */}
-      <td className="px-5 py-4">
+      <td className="px-5 py-2">
         <span className="whitespace-nowrap font-mono text-sm text-slate-700 dark:text-slate-300">
           {formatPunch(record.lastPunch)}
         </span>
       </td>
 
       {/* Last Punch Reader */}
-      <td className="px-5 py-4">
+      <td className="px-5 py-2">
         <span className="whitespace-nowrap text-sm text-slate-600 dark:text-slate-400">
           {record.lastPunchReader || "—"}
         </span>
       </td>
 
       {/* Punches */}
-      <td className="px-5 py-4">
+      <td className="px-5 py-2">
         <span className="inline-flex min-w-8 items-center justify-center rounded-md bg-slate-100 px-2 py-1 text-sm font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
           {record.totalPunches}
         </span>
       </td>
 
       {/* Stay Time */}
-      <td className="px-5 py-4">
+      <td className="px-5 py-2">
         <span className="whitespace-nowrap font-mono text-sm text-slate-700 dark:text-slate-300">
           {record.stayTime || "00:00:00"}
         </span>
       </td>
 
       {/* Status */}
-      <td className="px-5 py-4">
-        <span
-          className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusClasses(
-            record.attendanceStatus
-          )}`}
-        >
-          {record.attendanceStatus || "Unknown"}
-        </span>
+      <td className="px-5 py-2">
+        <div className="flex flex-wrap gap-1.5">
+          {!record.hasAttendance ? (
+            <span className="inline-flex whitespace-nowrap rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-400">
+              No Attendance
+            </span>
+          ) : (
+            <span className="inline-flex whitespace-nowrap rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+              Present
+            </span>
+          )}
+
+          {record.isLate && (
+            <span className="inline-flex whitespace-nowrap rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
+              Late
+            </span>
+          )}
+
+          {record.isEarlyOut && (
+            <span className="inline-flex whitespace-nowrap rounded-full bg-orange-50 px-2.5 py-1 text-xs font-semibold text-orange-700 dark:bg-orange-950/40 dark:text-orange-400">
+              Early Out
+            </span>
+          )}
+        </div>
       </td>
     </tr>
   );
@@ -718,7 +788,7 @@ function AttendanceRow({
 
 function LoadingTable() {
   return (
-    <div className="p-5">
+    <div className="p-2">
       <div className="space-y-4">
         {Array.from({ length: 7 }).map((_, index) => (
           <div
@@ -756,13 +826,13 @@ function EmptyState({
       <h3 className="mt-4 text-sm font-semibold text-slate-900 dark:text-white">
         {hasFilters
           ? "No matching employees"
-          : "No attendance records"}
+          : "No employees found"}
       </h3>
 
       <p className="mt-1 max-w-md text-sm text-slate-500">
         {hasFilters
           ? "Try changing your search or filter criteria."
-          : "There are no attendance records for the selected date."}
+          : "There are no employees matching the selected date and filters."}
       </p>
 
       {hasFilters && (

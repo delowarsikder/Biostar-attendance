@@ -24,6 +24,8 @@ export class AttendanceService {
         return {
             data: result.records,
 
+            summary: result.summary,
+
             pagination: {
                 page: filters.page,
                 pageSize: filters.pageSize,

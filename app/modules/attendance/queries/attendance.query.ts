@@ -5,12 +5,85 @@ import {
 
 const readerList = ATTENDANCE_READERS.join(", ");
 
+/**
+ * ============================================================
+ * COMMON ATTENDANCE QUERY
+ * ============================================================
+ */
 export const ATTENDANCE_QUERY = `
-WITH Punches AS
+WITH Employees AS
+(
+    SELECT
+        U.nUserIdn AS UserIdn,
+        U.sUserID AS EmployeeID,
+        U.sUserName AS EmployeeName,
+        U.nDepartmentIdn AS DepartmentID,
+        D.sName AS DepartmentName
+
+    FROM TB_USER U
+
+    LEFT JOIN TB_USER_DEPT D
+        ON D.nDepartmentIdn = U.nDepartmentIdn
+
+    WHERE
+        U.sUserID IS NOT NULL
+),
+
+DailyTA AS
+(
+    SELECT
+        R.nUserIdn AS UserIdn,
+
+        CAST(
+            DATEADD(
+                SECOND,
+                R.nDateTime,
+                '1970-01-01'
+            ) AS DATE
+        ) AS AttendanceDate,
+
+        R.nStartTime,
+        R.nEndTime,
+        R.nTAResult,
+        R.nWorkTime,
+        R.nLateInTime,
+        R.nEarlyOutTime,
+        R.nIsModify,
+
+        ROW_NUMBER() OVER
+        (
+            PARTITION BY
+                R.nUserIdn,
+                CAST(
+                    DATEADD(
+                        SECOND,
+                        R.nDateTime,
+                        '1970-01-01'
+                    ) AS DATE
+                )
+
+            ORDER BY
+                R.nDateTime DESC
+        ) AS RN
+
+    FROM TB_TA_RESULT R
+
+    WHERE
+        @date IS NULL
+
+        OR CAST(
+            DATEADD(
+                SECOND,
+                R.nDateTime,
+                '1970-01-01'
+            ) AS DATE
+        ) = @date
+),
+
+ValidPunches AS
 (
     SELECT
         E.nEventLogIdn,
-
         E.nUserID,
 
         DATEADD(
@@ -24,49 +97,35 @@ WITH Punches AS
         R.sName AS ReaderName,
 
         U.sUserID AS EmployeeID,
-
-        U.sUserName AS EmployeeName,
-
-        U.nDepartmentIdn AS DepartmentID,
-
-        D.sName AS DepartmentName
+        U.sUserName AS EmployeeName
 
     FROM TB_EVENT_LOG E
 
     INNER JOIN TB_USER U
-        ON CAST(E.nUserID AS VARCHAR(64)) = U.sUserID
+        ON CAST(
+            E.nUserID AS VARCHAR(64)
+        ) = U.sUserID
 
     LEFT JOIN TB_READER R
         ON E.nReaderIdn = R.nReaderIdn
 
-    LEFT JOIN TB_USER_DEPT D
-        ON D.nDepartmentIdn = U.nDepartmentIdn
+    WHERE
+        E.nEventIdn = ${BIOSTAR_IDENTIFY_SUCCESS_EVENT}
 
-    WHERE E.nEventIdn = ${BIOSTAR_IDENTIFY_SUCCESS_EVENT}
+        AND E.nReaderIdn IN (${readerList})
 
-      AND E.nReaderIdn IN (${readerList})
+        AND
+        (
+            @date IS NULL
 
-      AND (
-          @date IS NULL
-          OR CAST(
-              DATEADD(
-                  SECOND,
-                  E.nDateTime,
-                  '1970-01-01'
-              ) AS DATE
-          ) = @date
-      )
-
-      AND (
-          @employeeId IS NULL
-          OR U.sUserID = @employeeId
-      )
-
-      AND (
-          @search IS NULL
-          OR U.sUserID LIKE '%' + @search + '%'
-          OR U.sUserName LIKE '%' + @search + '%'
-      )
+            OR CAST(
+                DATEADD(
+                    SECOND,
+                    E.nDateTime,
+                    '1970-01-01'
+                ) AS DATE
+            ) = @date
+        )
 ),
 
 RankedPunches AS
@@ -96,19 +155,17 @@ RankedPunches AS
                 nEventLogIdn DESC
         ) AS LastPunchRank
 
-    FROM Punches
+    FROM ValidPunches
 ),
 
-DailyAttendance AS
+PunchSummary AS
 (
     SELECT
         EmployeeID,
-        EmployeeName,
 
-        DepartmentID,
-        DepartmentName,
-
-        CAST(EventDateTime AS DATE) AS AttendanceDate,
+        CAST(
+            EventDateTime AS DATE
+        ) AS AttendanceDate,
 
         MIN(EventDateTime) AS FirstPunch,
 
@@ -116,54 +173,134 @@ DailyAttendance AS
 
         COUNT(*) AS TotalPunches
 
-    FROM Punches
+    FROM ValidPunches
 
     GROUP BY
         EmployeeID,
-        EmployeeName,
 
-        DepartmentID,
-        DepartmentName,
-
-        CAST(EventDateTime AS DATE)
+        CAST(
+            EventDateTime AS DATE
+        )
 ),
 
-Result AS
+PunchDetails AS
 (
     SELECT
-        A.EmployeeID,
-        A.EmployeeName,
+        P.EmployeeID,
+        P.AttendanceDate,
 
-        A.DepartmentID,
-        A.DepartmentName,
-
-        A.AttendanceDate,
-
-        A.FirstPunch,
+        P.FirstPunch,
         FP.ReaderName AS FirstPunchReader,
 
-        A.LastPunch,
+        P.LastPunch,
         LP.ReaderName AS LastPunchReader,
 
-        A.TotalPunches,
+        P.TotalPunches,
 
         DATEDIFF(
             SECOND,
-            A.FirstPunch,
-            A.LastPunch
+            P.FirstPunch,
+            P.LastPunch
         ) AS StaySeconds
 
-    FROM DailyAttendance A
+    FROM PunchSummary P
 
     LEFT JOIN RankedPunches FP
-        ON FP.EmployeeID = A.EmployeeID
-        AND CAST(FP.EventDateTime AS DATE) = A.AttendanceDate
+        ON FP.EmployeeID = P.EmployeeID
+
+        AND CAST(
+            FP.EventDateTime AS DATE
+        ) = P.AttendanceDate
+
         AND FP.FirstPunchRank = 1
 
     LEFT JOIN RankedPunches LP
-        ON LP.EmployeeID = A.EmployeeID
-        AND CAST(LP.EventDateTime AS DATE) = A.AttendanceDate
+        ON LP.EmployeeID = P.EmployeeID
+
+        AND CAST(
+            LP.EventDateTime AS DATE
+        ) = P.AttendanceDate
+
         AND LP.LastPunchRank = 1
+),
+
+FinalData AS
+(
+    SELECT
+        E.EmployeeID,
+        E.EmployeeName,
+
+        E.DepartmentID,
+        E.DepartmentName,
+
+        @date AS AttendanceDate,
+
+        P.FirstPunch,
+        P.FirstPunchReader,
+
+        P.LastPunch,
+        P.LastPunchReader,
+
+        ISNULL(
+            P.TotalPunches,
+            0
+        ) AS TotalPunches,
+
+        ISNULL(
+            P.StaySeconds,
+            0
+        ) AS StaySeconds,
+
+        T.nStartTime,
+        T.nEndTime,
+        T.nTAResult,
+        T.nWorkTime,
+        T.nLateInTime,
+        T.nEarlyOutTime,
+        T.nIsModify
+
+    FROM Employees E
+
+    LEFT JOIN DailyTA T
+        ON T.UserIdn = E.UserIdn
+
+        AND T.RN = 1
+
+        AND
+        (
+            @date IS NULL
+            OR T.AttendanceDate = @date
+        )
+
+    LEFT JOIN PunchDetails P
+        ON P.EmployeeID = E.EmployeeID
+
+        AND
+        (
+            @date IS NULL
+            OR P.AttendanceDate = @date
+        )
+
+    WHERE
+        (
+            @employeeId IS NULL
+            OR E.EmployeeID = @employeeId
+        )
+
+        AND
+        (
+            @search IS NULL
+
+            OR E.EmployeeID LIKE '%' + @search + '%'
+
+            OR E.EmployeeName LIKE '%' + @search + '%'
+        )
+
+        AND
+        (
+            @departmentId IS NULL
+            OR E.DepartmentID = @departmentId
+        )
 )
 
 SELECT
@@ -179,19 +316,27 @@ SELECT
         23
     ) AS AttendanceDate,
 
-    CONVERT(
-        VARCHAR(19),
-        FirstPunch,
-        120
-    ) AS FirstPunch,
+    CASE
+        WHEN FirstPunch IS NOT NULL
+        THEN CONVERT(
+            VARCHAR(19),
+            FirstPunch,
+            120
+        )
+        ELSE NULL
+    END AS FirstPunch,
 
     FirstPunchReader,
 
-    CONVERT(
-        VARCHAR(19),
-        LastPunch,
-        120
-    ) AS LastPunch,
+    CASE
+        WHEN LastPunch IS NOT NULL
+        THEN CONVERT(
+            VARCHAR(19),
+            LastPunch,
+            120
+        )
+        ELSE NULL
+    END AS LastPunch,
 
     LastPunchReader,
 
@@ -199,25 +344,172 @@ SELECT
 
     StaySeconds,
 
-    'Present' AS AttendanceStatus
+    CASE
+        WHEN TotalPunches > 0
+        THEN 1
+        ELSE 0
+    END AS HasAttendance,
 
-FROM Result
+    CASE
+        WHEN TotalPunches > 0
+        THEN 1
+        ELSE 0
+    END AS IsPresent,
+
+    CASE
+        WHEN ISNULL(nLateInTime, 0) > 0
+        THEN 1
+        ELSE 0
+    END AS IsLate,
+
+    CASE
+        WHEN ISNULL(nEarlyOutTime, 0) > 0
+        THEN 1
+        ELSE 0
+    END AS IsEarlyOut,
+
+    CASE
+        WHEN TotalPunches > 0
+        THEN 'Present'
+        ELSE 'No Attendance'
+    END AS AttendanceStatus,
+
+    nStartTime,
+    nEndTime,
+    nTAResult,
+    nWorkTime,
+    nLateInTime,
+    nEarlyOutTime,
+    nIsModify
+
+FROM FinalData
 
 ORDER BY
-    AttendanceDate DESC,
-    EmployeeID ASC
+    EmployeeName ASC
 
 OFFSET @offset ROWS
+
 FETCH NEXT @pageSize ROWS ONLY;
 `;
 
-export const ATTENDANCE_COUNT_QUERY = `
-SELECT COUNT(*) AS Total
 
-FROM
+/**
+ * ============================================================
+ * TOTAL EMPLOYEE COUNT
+ * ============================================================
+ *
+ * This is NOT affected by pagination.
+ */
+export const ATTENDANCE_COUNT_QUERY = `
+SELECT
+    COUNT(*) AS Total
+
+FROM TB_USER U
+
+WHERE
+    U.sUserID IS NOT NULL
+
+    AND
+    (
+        @employeeId IS NULL
+        OR U.sUserID = @employeeId
+    )
+
+    AND
+    (
+        @search IS NULL
+
+        OR U.sUserID LIKE '%' + @search + '%'
+
+        OR U.sUserName LIKE '%' + @search + '%'
+    )
+
+    AND
+    (
+        @departmentId IS NULL
+        OR U.nDepartmentIdn = @departmentId
+    );
+`;
+
+
+/**
+ * ============================================================
+ * FULL ATTENDANCE SUMMARY
+ * ============================================================
+ *
+ * IMPORTANT:
+ *
+ * There is NO OFFSET/FETCH here.
+ *
+ * Therefore the cards calculate values from ALL
+ * employees matching the current filters.
+ */
+export const ATTENDANCE_SUMMARY_QUERY = `
+WITH Employees AS
 (
     SELECT
-        U.sUserID,
+        U.nUserIdn AS UserIdn,
+        U.sUserID AS EmployeeID,
+        U.sUserName AS EmployeeName,
+        U.nDepartmentIdn AS DepartmentID
+
+    FROM TB_USER U
+
+    WHERE
+        U.sUserID IS NOT NULL
+),
+
+DailyTA AS
+(
+    SELECT
+        R.nUserIdn AS UserIdn,
+
+        CAST(
+            DATEADD(
+                SECOND,
+                R.nDateTime,
+                '1970-01-01'
+            ) AS DATE
+        ) AS AttendanceDate,
+
+        R.nLateInTime,
+        R.nEarlyOutTime,
+
+        ROW_NUMBER() OVER
+        (
+            PARTITION BY
+                R.nUserIdn,
+
+                CAST(
+                    DATEADD(
+                        SECOND,
+                        R.nDateTime,
+                        '1970-01-01'
+                    ) AS DATE
+                )
+
+            ORDER BY
+                R.nDateTime DESC
+        ) AS RN
+
+    FROM TB_TA_RESULT R
+
+    WHERE
+        @date IS NULL
+
+        OR CAST(
+            DATEADD(
+                SECOND,
+                R.nDateTime,
+                '1970-01-01'
+            ) AS DATE
+        ) = @date
+),
+
+Punches AS
+(
+    SELECT
+        U.sUserID AS EmployeeID,
 
         CAST(
             DATEADD(
@@ -225,41 +517,34 @@ FROM
                 E.nDateTime,
                 '1970-01-01'
             ) AS DATE
-        ) AS AttendanceDate
+        ) AS AttendanceDate,
+
+        COUNT(*) AS TotalPunches
 
     FROM TB_EVENT_LOG E
 
     INNER JOIN TB_USER U
-        ON CAST(E.nUserID AS VARCHAR(64)) = U.sUserID
+        ON CAST(
+            E.nUserID AS VARCHAR(64)
+        ) = U.sUserID
 
-    LEFT JOIN TB_USER_DEPT D
-        ON D.nDepartmentIdn = U.nDepartmentIdn
+    WHERE
+        E.nEventIdn = ${BIOSTAR_IDENTIFY_SUCCESS_EVENT}
 
-    WHERE E.nEventIdn = ${BIOSTAR_IDENTIFY_SUCCESS_EVENT}
+        AND E.nReaderIdn IN (${readerList})
 
-      AND E.nReaderIdn IN (${readerList})
+        AND
+        (
+            @date IS NULL
 
-      AND (
-          @date IS NULL
-          OR CAST(
-              DATEADD(
-                  SECOND,
-                  E.nDateTime,
-                  '1970-01-01'
-              ) AS DATE
-          ) = @date
-      )
-
-      AND (
-          @employeeId IS NULL
-          OR U.sUserID = @employeeId
-      )
-
-      AND (
-          @search IS NULL
-          OR U.sUserID LIKE '%' + @search + '%'
-          OR U.sUserName LIKE '%' + @search + '%'
-      )
+            OR CAST(
+                DATEADD(
+                    SECOND,
+                    E.nDateTime,
+                    '1970-01-01'
+                ) AS DATE
+            ) = @date
+        )
 
     GROUP BY
         U.sUserID,
@@ -271,5 +556,145 @@ FROM
                 '1970-01-01'
             ) AS DATE
         )
-) AS DailyRecords;
+),
+
+FinalSummary AS
+(
+    SELECT
+        E.EmployeeID,
+
+        CASE
+            WHEN ISNULL(
+                P.TotalPunches,
+                0
+            ) > 0
+
+            THEN 1
+            ELSE 0
+        END AS HasAttendance,
+
+        CASE
+            WHEN ISNULL(
+                P.TotalPunches,
+                0
+            ) > 0
+
+            THEN 1
+            ELSE 0
+        END AS IsPresent,
+
+        CASE
+            WHEN ISNULL(
+                T.nLateInTime,
+                0
+            ) > 0
+
+            THEN 1
+            ELSE 0
+        END AS IsLate,
+
+        CASE
+            WHEN ISNULL(
+                T.nEarlyOutTime,
+                0
+            ) > 0
+
+            THEN 1
+            ELSE 0
+        END AS IsEarlyOut
+
+    FROM Employees E
+
+    LEFT JOIN Punches P
+        ON P.EmployeeID = E.EmployeeID
+
+        AND
+        (
+            @date IS NULL
+            OR P.AttendanceDate = @date
+        )
+
+    LEFT JOIN DailyTA T
+        ON T.UserIdn = E.UserIdn
+
+        AND T.RN = 1
+
+        AND
+        (
+            @date IS NULL
+            OR T.AttendanceDate = @date
+        )
+
+    WHERE
+        (
+            @employeeId IS NULL
+
+            OR E.EmployeeID = @employeeId
+        )
+
+        AND
+        (
+            @search IS NULL
+
+            OR E.EmployeeID LIKE '%' + @search + '%'
+
+            OR E.EmployeeName LIKE '%' + @search + '%'
+        )
+
+        AND
+        (
+            @departmentId IS NULL
+
+            OR E.DepartmentID = @departmentId
+        )
+)
+
+SELECT
+    COUNT(*) AS TotalEmployees,
+
+    COALESCE(
+        SUM(
+            CASE
+                WHEN IsPresent = 1
+                THEN 1
+                ELSE 0
+            END
+        ),
+        0
+    ) AS Present,
+
+    COALESCE(
+        SUM(
+            CASE
+                WHEN HasAttendance = 0
+                THEN 1
+                ELSE 0
+            END
+        ),
+        0
+    ) AS NoAttendance,
+
+    COALESCE(
+        SUM(
+            CASE
+                WHEN IsLate = 1
+                THEN 1
+                ELSE 0
+            END
+        ),
+        0
+    ) AS Late,
+
+    COALESCE(
+        SUM(
+            CASE
+                WHEN IsEarlyOut = 1
+                THEN 1
+                ELSE 0
+            END
+        ),
+        0
+    ) AS EarlyOut
+
+FROM FinalSummary;
 `;

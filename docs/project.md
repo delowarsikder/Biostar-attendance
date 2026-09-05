@@ -290,4 +290,25 @@ Employee Master
                           │
                           ▼
                 /api/v1/events
-                
+
+```text
+                     ┌─────────────────────┐
+                         │       TB_USER       │
+                         │   ALL EMPLOYEES  │
+                         └──────────┬──────────┘
+                                    │
+              ┌─────────────────────┼─────────────────────┐
+              │                     │                     │
+              ▼                     ▼                     ▼
+       TB_USER_DEPT           TB_TA_RESULT          TB_EVENT_LOG
+       Department             Daily Status           Punch Details
+              │                     │                     │
+              │              ┌──────┴──────┐              │
+              │              │             │              │
+              │           Absence      Missing Out       │
+              │                           Normal         │
+              │                                          │
+              └──────────────────────┬───────────────────┘
+                                     ▼
+                         Daily Attendance Record
+```             
