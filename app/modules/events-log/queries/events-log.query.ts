@@ -91,6 +91,57 @@ WHERE
         OR E.nEventIdn = @eventId
     )
 
+    AND (
+        @readerId IS NULL
+        OR E.nReaderIdn = @readerId
+    )
+
+    AND (
+        @direction IS NULL
+        OR (
+            @direction = 'IN'
+            AND E.nReaderIdn IN (
+                539338120,
+                539339462,
+                539339471,
+                539339528
+            )
+        )
+        OR (
+            @direction = 'OUT'
+            AND E.nReaderIdn IN (
+                539338112,
+                539339465,
+                539339470,
+                539339534
+            )
+        )
+        OR (
+            @direction = 'UNKNOWN'
+            AND E.nReaderIdn NOT IN (
+                539338120,
+                539339462,
+                539339471,
+                539339528,
+                539338112,
+                539339465,
+                539339470,
+                539339534
+            )
+        )
+    )
+
+    AND (
+        @reader IS NULL
+        OR R.sName = @reader
+    )
+
+    AND (
+        @search IS NULL
+        OR CAST(E.nUserID AS VARCHAR(64)) LIKE '%' + @search + '%'
+        OR U.sUserName LIKE '%' + @search + '%'
+    )
+
 ORDER BY
     E.nDateTime ASC,
     E.nEventLogIdn ASC;

@@ -3,7 +3,7 @@ import {
   BIOSTAR_IDENTIFY_SUCCESS_EVENT,
 } from "../attendance.constants";
 
-const readerList = ATTENDANCE_READERS.join(", ");
+const readerList = ATTENDANCE_READERS.map(reader => reader.id).join(", ");
 
 /**
  * ============================================================
@@ -190,10 +190,10 @@ PunchDetails AS
         P.AttendanceDate,
 
         P.FirstPunch,
-        FP.ReaderName AS FirstPunchReader,
+        FP.nReaderIdn AS FirstPunchReader,
 
-        P.LastPunch,
-        LP.ReaderName AS LastPunchReader,
+        P.LastPunch, 
+        LP.nReaderIdn AS LastPunchReader,
 
         P.TotalPunches,
 

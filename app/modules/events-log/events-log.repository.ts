@@ -48,6 +48,30 @@ export class EventsRepository {
       filters.eventId ?? null
     );
 
+    request.input(
+      "readerId",
+      sql.Int,
+      filters.readerId ?? null
+    );
+
+    request.input(
+      "direction",
+      sql.VarChar(10),
+      filters.direction ?? null
+    );
+
+    request.input(
+      "reader",
+      sql.NVarChar(100),
+      filters.reader ?? null
+    );
+
+    request.input(
+      "search",
+      sql.NVarChar(100),
+      filters.search ?? null
+    );
+
     const result = await request.query<EventHistoryRow>(
       GET_EVENTS_QUERY
     );

@@ -4,7 +4,10 @@ export interface EventHistoryFilters {
   employeeId?: string;
   date?: string;
   eventId?: number;
+  readerId?: number;
   search?: string;
+  direction?: string;
+  reader?: string;
 }
 
 export interface EventHistoryItem {

@@ -55,36 +55,71 @@ export interface AttendanceResponse {
   message?: string;
 }
 
-interface AttendanceParams {
+/*
+ * Parameters accepted by the attendance API.
+ */
+export interface AttendanceParams {
+  /*
+   * Required
+   */
   date: string;
 
+  /*
+   * Employee ID
+   */
   employeeId?: string;
 
+  /*
+   * Pagination
+   */
   page?: number;
   pageSize?: number;
 
+  /*
+   * Employee search
+   */
   search?: string;
+
+  /*
+   * Department filter
+   */
   departmentId?: number;
+
+  /*
+   * Reader filter
+   *
+   * Example:
+   * HR-In
+   * HR-Out
+   * Ad-In
+   */
+  reader?: string;
+
+  /*
+   * Status filter
+   *
+   * Possible values:
+   *
+   * present
+   * no_attendance
+   * late
+   * early_out
+   */
+  status?: string;
 }
 
 /**
  * Get daily attendance.
  *
- * Pagination is handled by the API.
+ * Pagination and filtering are handled by the API.
  *
  * Example:
  *
  * page = 1, pageSize = 25
- * -> employees 1-25
+ * -> first 25 matching employees
  *
  * page = 2, pageSize = 25
- * -> employees 26-50
- *
- * page = 3, pageSize = 25
- * -> employees 51-75
- *
- * page = 4, pageSize = 25
- * -> employees 76-90
+ * -> next 25 matching employees
  */
 export async function getAttendance(
   params: AttendanceParams
@@ -92,16 +127,22 @@ export async function getAttendance(
   const searchParams = new URLSearchParams();
 
   /*
-   * Required date.
+   * ----------------------------------------
+   * Required date
+   * ----------------------------------------
    */
+
   searchParams.set(
     "date",
     params.date
   );
 
   /*
-   * Employee ID filter.
+   * ----------------------------------------
+   * Employee ID
+   * ----------------------------------------
    */
+
   if (params.employeeId) {
     searchParams.set(
       "employeeId",
@@ -110,12 +151,11 @@ export async function getAttendance(
   }
 
   /*
-   * Pagination.
-   *
-   * These are important.
-   *
-   * The frontend will control the current page.
+   * ----------------------------------------
+   * Pagination
+   * ----------------------------------------
    */
+
   searchParams.set(
     "page",
     String(params.page ?? 1)
@@ -127,18 +167,24 @@ export async function getAttendance(
   );
 
   /*
-   * Employee search.
+   * ----------------------------------------
+   * Employee search
+   * ----------------------------------------
    */
-  if (params.search) {
+
+  if (params.search?.trim()) {
     searchParams.set(
       "search",
-      params.search
+      params.search.trim()
     );
   }
 
   /*
-   * Department filter.
+   * ----------------------------------------
+   * Department
+   * ----------------------------------------
    */
+
   if (
     params.departmentId !== undefined
   ) {
@@ -149,15 +195,53 @@ export async function getAttendance(
   }
 
   /*
-   * Call API.
+   * ----------------------------------------
+   * Reader
+   * ----------------------------------------
+   */
+
+  if (
+    params.reader &&
+    params.reader !== "all"
+  ) {
+    searchParams.set(
+      "reader",
+      params.reader
+    );
+  }
+
+  /*
+   * ----------------------------------------
+   * Status
+   * ----------------------------------------
+   */
+
+  if (
+    params.status &&
+    params.status !== "all"
+  ) {
+    searchParams.set(
+      "status",
+      params.status
+    );
+  }
+
+  /*
+   * ----------------------------------------
+   * API request
+   * ----------------------------------------
    *
-   * Example generated URL:
+   * Example:
    *
    * /api/v1/daily/attendance
    *   ?date=2026-09-05
    *   &page=1
    *   &pageSize=25
+   *   &reader=HR-In
+   *   &status=early_out
+   *
    */
+
   return apiClient<AttendanceResponse>(
     `/api/v1/daily/attendance?${searchParams.toString()}`
   );

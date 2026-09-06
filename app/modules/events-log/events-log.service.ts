@@ -5,6 +5,19 @@ import {
   EventHistoryResponse,
 } from "./events-log.types";
 
+export interface EventsServiceParams extends EventHistoryFilters {
+  page: number;
+  pageSize: number;
+}
+
+export interface EventsServiceResult {
+  events: EventHistoryResponse["events"];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 export class EventsService {
   private repository: EventsRepository;
 
@@ -13,14 +26,25 @@ export class EventsService {
   }
 
   async getEvents(
-    filters: EventHistoryFilters
-  ): Promise<EventHistoryResponse> {
+    params: EventsServiceParams
+  ): Promise<EventsServiceResult> {
+    const { page, pageSize, ...filters } = params;
+
     const events =
       await this.repository.getEvents(filters);
 
+    const total = events.length;
+    const totalPages = Math.ceil(total / pageSize);
+
+    const start = (page - 1) * pageSize;
+    const paginatedEvents = events.slice(start, start + pageSize);
+
     return {
-      total: events.length,
-      events,
+      events: paginatedEvents,
+      total,
+      page,
+      pageSize,
+      totalPages,
     };
   }
 }

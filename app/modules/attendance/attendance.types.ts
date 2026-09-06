@@ -1,27 +1,19 @@
 export interface AttendanceRecord {
   employeeId: string;
   employeeName: string;
-
   departmentId: number | null;
   departmentName: string | null;
-
   attendanceDate: string;
-
   firstPunch: string;
-  firstPunchReader: string;
-
+  firstPunchReader: string | number;
   lastPunch: string;
-  lastPunchReader: string;
-
+  lastPunchReader: string | number;
   totalPunches: number;
-
   stayTime: string;
-
   hasAttendance: boolean;
   isPresent: boolean;
   isLate: boolean;
   isEarlyOut: boolean;
-
   attendanceStatus: string;
 }
 
@@ -41,11 +33,17 @@ export interface AttendancePagination {
 }
 
 export interface AttendanceResponse {
-  success: boolean;
-
   data: AttendanceRecord[];
-
   summary: AttendanceSummary;
-
   pagination: AttendancePagination;
+  departments: string[]; // <-- new
+}
+
+export interface AttendanceFilters {
+  date?: string;
+  employeeId?: string;
+  search?: string;
+  departmentId?: number;
+  page: number;
+  pageSize: number;
 }

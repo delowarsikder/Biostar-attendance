@@ -100,7 +100,7 @@ export class AttendanceRepository {
 
     const departmentId =
       filters.departmentId !== undefined &&
-      filters.departmentId !== null
+        filters.departmentId !== null
         ? filters.departmentId
         : null;
 
@@ -325,10 +325,10 @@ export class AttendanceRepository {
 
           departmentId:
             row.DepartmentID !== null &&
-            row.DepartmentID !== undefined
+              row.DepartmentID !== undefined
               ? Number(
-                  row.DepartmentID
-                )
+                row.DepartmentID
+              )
               : null,
 
           departmentName:
@@ -393,7 +393,19 @@ export class AttendanceRepository {
       summary,
     };
   }
+  // app/modules/attendance/attendance.repository.ts
 
+  // Add this method
+  async getDepartments(): Promise<string[]> {
+    const pool = await getBioStarDB();
+    const result = await pool.request().query(`
+    SELECT DISTINCT sName AS DepartmentName
+    FROM TB_USER_DEPT
+    WHERE sName IS NOT NULL
+    ORDER BY sName
+  `);
+    return result.recordset.map((row: any) => row.DepartmentName);
+  }
   /**
    * Converts SQL date/time values to a string.
    */
