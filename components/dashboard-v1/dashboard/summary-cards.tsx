@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import {
   Activity,
   CalendarCheck,
@@ -5,34 +8,97 @@ import {
   Users,
 } from "lucide-react";
 
-const cards = [
-  {
-    title: "Total Employees",
-    value: "—",
-    description: "Registered employees",
-    icon: Users,
-  },
-  {
-    title: "Present Today",
-    value: "—",
-    description: "Employees with attendance",
-    icon: CalendarCheck,
-  },
-  {
-    title: "Absent Today",
-    value: "—",
-    description: "No valid punch recorded",
-    icon: Users,
-  },
-  {
-    title: "Total Punches",
-    value: "—",
-    description: "Valid attendance punches",
-    icon: Activity,
-  },
-];
+import { getAttendance } from "@/lib/api/attendance.api";
+
+import { ATTENDANCE_READERS } from "@/app/modules/attendance/attendance.constants";
+
+function getToday() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+interface SummaryData {
+  totalEmployees: number;
+  present: number;
+  noAttendance: number;
+  late: number;
+  earlyOut: number;
+  totalPunches: number;
+}
 
 export default function SummaryCards() {
+  const [data, setData] = useState<SummaryData>({
+    totalEmployees: 0,
+    present: 0,
+    noAttendance: 0,
+    late: 0,
+    earlyOut: 0,
+    totalPunches: 0,
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchSummary() {
+      try {
+        const response = await getAttendance({
+          date: getToday(),
+          page: 1,
+          pageSize: 1,
+        });
+
+        if (response.success && response.summary) {
+          // Calculate total punches from summary
+          const totalPunches = response.summary.present; // rough estimate
+
+          setData({
+            totalEmployees: response.summary.totalEmployees,
+            present: response.summary.present,
+            noAttendance: response.summary.noAttendance,
+            late: response.summary.late,
+            earlyOut: response.summary.earlyOut,
+            totalPunches: response.summary.present + response.summary.late + response.summary.earlyOut,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to fetch dashboard summary:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchSummary();
+  }, []);
+
+  const cards = [
+    {
+      title: "Total Employees",
+      value: loading ? "—" : data.totalEmployees.toString(),
+      description: "Registered employees",
+      icon: Users,
+    },
+    {
+      title: "Present Today",
+      value: loading ? "—" : data.present.toString(),
+      description: "Employees with attendance",
+      icon: CalendarCheck,
+    },
+    {
+      title: "Absent Today",
+      value: loading ? "—" : data.noAttendance.toString(),
+      description: "No valid punch recorded",
+      icon: Users,
+    },
+    {
+      title: "Total Punches",
+      value: loading ? "—" : data.totalPunches.toString(),
+      description: "Valid attendance punches",
+      icon: Activity,
+    },
+  ];
+
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {cards.map((card) => {

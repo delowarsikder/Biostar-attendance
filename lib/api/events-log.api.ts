@@ -85,6 +85,62 @@ export interface EventsLogParams {
  * page = 2, pageSize = 25
  * -> next 25 matching events
  */
+/**
+ * Get all events log records for export (no pagination).
+ */
+export interface EventsLogExportParams {
+  date: string;
+  employeeId?: string;
+  search?: string;
+  direction?: string;
+  reader?: string;
+  eventId?: number;
+  readerId?: number;
+}
+
+export interface EventsLogExportResponse {
+  success: boolean;
+  data: EventLogRecord[];
+  total: number;
+  message?: string;
+}
+
+export async function getEventsLogForExport(
+  params: EventsLogExportParams
+): Promise<EventsLogExportResponse> {
+  const searchParams = new URLSearchParams();
+
+  searchParams.set("date", params.date);
+
+  if (params.employeeId) {
+    searchParams.set("employeeId", params.employeeId);
+  }
+
+  if (params.search?.trim()) {
+    searchParams.set("search", params.search.trim());
+  }
+
+  if (params.direction && params.direction !== "all") {
+    searchParams.set("direction", params.direction);
+  }
+
+  if (params.reader && params.reader !== "all") {
+    searchParams.set("reader", params.reader);
+  }
+
+  if (params.eventId !== undefined) {
+    searchParams.set("eventId", String(params.eventId));
+  }
+
+  if (params.readerId !== undefined) {
+    searchParams.set("readerId", String(params.readerId));
+  }
+
+  return apiClient<EventsLogExportResponse>(
+    `/api/v1/daily/events-log/export?${searchParams.toString()}`
+  );
+}
+
 export async function getEventsLog(
   params: EventsLogParams
 ): Promise<{

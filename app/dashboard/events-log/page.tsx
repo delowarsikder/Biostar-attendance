@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
   ChevronDown,
+  Download,
   Filter,
   RefreshCw,
   Search,
@@ -16,7 +17,11 @@ import {
   EventLogRecord,
   EventsLogPagination,
   getEventsLog,
+  getEventsLogForExport,
+  EventsLogExportParams,
 } from "@/lib/api/events-log.api";
+
+import { exportToExcel, exportToPDF } from "@/lib/utils/export";
 
 import {
   ATTENDANCE_READERS,
@@ -125,6 +130,7 @@ export default function EventsLogPage() {
   const loadEvents =
     useCallback(
       async () => {
+        setLoading(true);
         try {
           setError(null);
 
@@ -200,8 +206,6 @@ export default function EventsLogPage() {
    */
 
   useEffect(() => {
-    setLoading(true);
-
     loadEvents();
   }, [
     loadEvents,
@@ -318,6 +322,139 @@ export default function EventsLogPage() {
 
   /*
    * ========================================
+   * Export handlers
+   * ========================================
+   */
+
+  const handleExportExcel = async () => {
+    try {
+      const exportParams: EventsLogExportParams = {
+        date,
+        search: search.trim() || undefined,
+        direction:
+          directionFilter === "all" ? undefined : directionFilter,
+        readerId:
+          readerFilter === "all" ? undefined : readerFilter,
+      };
+
+      const response = await getEventsLogForExport(exportParams);
+
+      if (!response.success) {
+        throw new Error(
+          response.message || "Failed to export events log."
+        );
+      }
+
+      const columns = [
+        { header: "SL No.", key: "serialNumber", width: 8 },
+        { header: "Time", key: "time", width: 12 },
+        { header: "Employee ID", key: "employeeId", width: 15 },
+        { header: "Employee Name", key: "employeeName", width: 25 },
+        { header: "Reader", key: "readerName", width: 20 },
+        { header: "Reader IP", key: "readerIp", width: 18 },
+        { header: "Direction", key: "direction", width: 12 },
+        { header: "Event ID", key: "eventId", width: 10 },
+        { header: "Event Name", key: "eventName", width: 25 },
+        { header: "Description", key: "eventDescription", width: 30 },
+      ];
+
+      const exportData = response.data.map((record, index) => {
+        const reader = ATTENDANCE_READERS.find((r) => r.id === record.readerId);
+        return {
+          serialNumber: index + 1,
+          time: record.time,
+          employeeId: record.employeeId,
+          employeeName: record.employeeName,
+          readerName: record.readerName,
+          readerIp: reader?.ip ?? "—",
+          direction: record.direction,
+          eventId: record.eventId,
+          eventName: record.eventName,
+          eventDescription: record.eventDescription ?? "—",
+        };
+      });
+
+      exportToExcel({
+        filename: `events-log_${date.replace(/-/g, "")}`,
+        sheetName: "Events Log",
+        columns,
+        data: exportData,
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Failed to export Excel.";
+      setError(message);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    try {
+      const exportParams: EventsLogExportParams = {
+        date,
+        search: search.trim() || undefined,
+        direction:
+          directionFilter === "all" ? undefined : directionFilter,
+        readerId:
+          readerFilter === "all" ? undefined : readerFilter,
+      };
+
+      const response = await getEventsLogForExport(exportParams);
+
+      if (!response.success) {
+        throw new Error(
+          response.message || "Failed to export events log."
+        );
+      }
+
+      const columns = [
+        { header: "SL No.", key: "serialNumber", width: 15 },
+        { header: "Time", key: "time", width: 25 },
+        { header: "Employee ID", key: "employeeId", width: 30 },
+        { header: "Employee", key: "employeeName", width: 40 },
+        { header: "Reader", key: "readerName", width: 30 },
+        { header: "Reader IP", key: "readerIp", width: 30 },
+        { header: "Direction", key: "direction", width: 20 },
+        { header: "Event ID", key: "eventId", width: 20 },
+        { header: "Event Name", key: "eventName", width: 35 },
+        { header: "Description", key: "eventDescription", width: 40 },
+      ];
+
+      const exportData = response.data.map((record, index) => {
+        const reader = ATTENDANCE_READERS.find((r) => r.id === record.readerId);
+        return {
+          serialNumber: index + 1,
+          time: record.time,
+          employeeId: record.employeeId,
+          employeeName: record.employeeName,
+          readerName: record.readerName,
+          readerIp: reader?.ip ?? "—",
+          direction: record.direction,
+          eventId: record.eventId,
+          eventName: record.eventName,
+          eventDescription: record.eventDescription ?? "—",
+        };
+      });
+
+      exportToPDF({
+        filename: `events-log_${date.replace(/-/g, "")}`,
+        columns,
+        data: exportData,
+        title: "Daily Events Log Report",
+        subtitle: `Date: ${date} | Total: ${response.total} events`,
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Failed to export PDF.";
+      setError(message);
+    }
+  };
+
+  /*
+   * ========================================
    * Render
    * ========================================
    */
@@ -341,28 +478,45 @@ export default function EventsLogPage() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={
-              handleRefresh
-            }
-            disabled={
-              loading ||
-              refreshing
-            }
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
-          >
-            <RefreshCw
-              className={`h-4 w-4 ${refreshing
-                ? "animate-spin"
-                : ""
-                }`}
-            />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              disabled={loading || records.length === 0}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+            >
+              <Download className="h-4 w-4" />
+              Export Excel
+            </button>
 
-            {refreshing
-              ? "Refreshing..."
-              : "Refresh"}
-          </button>
+            <button
+              type="button"
+              onClick={handleExportPDF}
+              disabled={loading || records.length === 0}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+            >
+              <Download className="h-4 w-4" />
+              Export PDF
+            </button>
+
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={loading || refreshing}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${refreshing
+                  ? "animate-spin"
+                  : ""
+                  }`}
+              />
+
+              {refreshing
+                ? "Refreshing..."
+                : "Refresh"}
+            </button>
+          </div>
         </section>
 
         {/* ================================= */}
@@ -724,10 +878,6 @@ export default function EventsLogPage() {
                     </TableHeader>
 
                     <TableHeader>
-                      Reader IP
-                    </TableHeader>
-
-                    <TableHeader>
                       Direction
                     </TableHeader>
 
@@ -841,8 +991,8 @@ function EventRow({
     record.direction === "IN"
       ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
       : record.direction === "OUT"
-      ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
-      : "bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+        ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
+        : "bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
 
   return (
     <tr className="transition hover:bg-slate-50 dark:hover:bg-slate-900/50">
@@ -884,17 +1034,6 @@ function EventRow({
         </span>
       </td>
 
-      {/* Reader IP - find from constants */}
-      <td className="px-5 py-2">
-        <span className="whitespace-nowrap text-sm text-slate-600 dark:text-slate-400 font-mono">
-          {(() => {
-            const r = ATTENDANCE_READERS.find(
-              (x) => x.id === record.readerId
-            );
-            return r ? r.ip : "—";
-          })()}
-        </span>
-      </td>
 
       {/* Direction */}
       <td className="px-5 py-2">

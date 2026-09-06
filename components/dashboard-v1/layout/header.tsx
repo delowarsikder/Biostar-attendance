@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  Menu,
-  UserCircle,
-  Sun,
-  Moon,
-} from "lucide-react";
-
+import { Menu, UserCircle, Sun, Moon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface HeaderProps {
@@ -15,83 +9,39 @@ interface HeaderProps {
 
 type Theme = "light" | "dark";
 
-export default function Header({
-  onMenuClick,
-}: HeaderProps) {
-  const [theme, setTheme] =
-    useState<Theme>("light");
+// Lazy initializer: runs only once when the component mounts
+function getInitialTheme(): Theme {
+  // Guard for SSR
+  if (typeof window === "undefined") {
+    return "light";
+  }
 
-  /*
-   * Load saved theme.
-   *
-   * If the user has never selected a theme,
-   * use the operating system preference.
-   */
+  const saved = localStorage.getItem("biostar-theme") as Theme | null;
+  if (saved === "light" || saved === "dark") {
+    return saved;
+  }
+
+  // Fallback to system preference
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  return prefersDark ? "dark" : "light";
+}
+
+export default function Header({ onMenuClick }: HeaderProps) {
+  const [theme, setTheme] = useState<Theme>(getInitialTheme);
+
+  // Apply theme to DOM whenever it changes
   useEffect(() => {
-    const savedTheme =
-      localStorage.getItem(
-        "biostar-theme"
-      ) as Theme | null;
+    const isDark = theme === "dark";
+    document.documentElement.classList.toggle("dark", isDark);
+    document.documentElement.style.colorScheme = theme;
 
-    if (
-      savedTheme === "light" ||
-      savedTheme === "dark"
-    ) {
-      setTheme(savedTheme);
-
-      document.documentElement.classList.toggle(
-        "dark",
-        savedTheme === "dark"
-      );
-
-      document.documentElement.style.colorScheme =
-        savedTheme;
-
-      return;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("biostar-theme", theme);
     }
+  }, [theme]);
 
-    const prefersDark =
-      window.matchMedia(
-        "(prefers-color-scheme: dark)"
-      ).matches;
-
-    const initialTheme: Theme =
-      prefersDark ? "dark" : "light";
-
-    setTheme(initialTheme);
-
-    document.documentElement.classList.toggle(
-      "dark",
-      prefersDark
-    );
-
-    document.documentElement.style.colorScheme =
-      initialTheme;
-  }, []);
-
-  /*
-   * Toggle between Light and Dark mode.
-   */
   const toggleTheme = () => {
-    const newTheme: Theme =
-      theme === "dark"
-        ? "light"
-        : "dark";
-
-    setTheme(newTheme);
-
-    localStorage.setItem(
-      "biostar-theme",
-      newTheme
-    );
-
-    document.documentElement.classList.toggle(
-      "dark",
-      newTheme === "dark"
-    );
-
-    document.documentElement.style.colorScheme =
-      newTheme;
+    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
   };
 
   return (
@@ -112,7 +62,6 @@ export default function Header({
     >
       {/* Left side */}
       <div className="flex items-center gap-3">
-        {/* Mobile menu */}
         <button
           type="button"
           onClick={onMenuClick}
@@ -157,7 +106,6 @@ export default function Header({
 
       {/* Right side */}
       <div className="flex items-center gap-3">
-        {/* Theme toggle */}
         <button
           type="button"
           onClick={toggleTheme}
@@ -200,7 +148,6 @@ export default function Header({
           )}
         </button>
 
-        {/* User information */}
         <div className="hidden text-right sm:block">
           <p
             className="
@@ -223,7 +170,6 @@ export default function Header({
           </p>
         </div>
 
-        {/* User icon */}
         <UserCircle
           className="
             h-8 w-8

@@ -52,6 +52,8 @@ export interface AttendanceResponse {
 
   pagination: AttendancePagination;
 
+  departments: string[];
+
   message?: string;
 }
 
@@ -121,6 +123,48 @@ export interface AttendanceParams {
  * page = 2, pageSize = 25
  * -> next 25 matching employees
  */
+/**
+ * Get all attendance records for export (no pagination).
+ */
+export interface AttendanceExportParams {
+  date: string;
+  employeeId?: string;
+  search?: string;
+  departmentId?: number;
+}
+
+export interface AttendanceExportResponse {
+  success: boolean;
+  data: AttendanceRecord[];
+  summary: AttendanceSummary;
+  total: number;
+  message?: string;
+}
+
+export async function getAttendanceForExport(
+  params: AttendanceExportParams
+): Promise<AttendanceExportResponse> {
+  const searchParams = new URLSearchParams();
+
+  searchParams.set("date", params.date);
+
+  if (params.employeeId) {
+    searchParams.set("employeeId", params.employeeId);
+  }
+
+  if (params.search?.trim()) {
+    searchParams.set("search", params.search.trim());
+  }
+
+  if (params.departmentId !== undefined) {
+    searchParams.set("departmentId", String(params.departmentId));
+  }
+
+  return apiClient<AttendanceExportResponse>(
+    `/api/v1/daily/attendance/export?${searchParams.toString()}`
+  );
+}
+
 export async function getAttendance(
   params: AttendanceParams
 ): Promise<AttendanceResponse> {

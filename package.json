@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@prisma/client": "^7.10.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "lucide-react": "^1.35.0",
     "mssql": "^12.7.0",
     "mysql2": "^3.24.2",

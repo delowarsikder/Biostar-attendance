@@ -7,6 +7,7 @@ import {
   ChevronDown,
   Clock3,
   ClockAlert,
+  Download,
   Filter,
   RefreshCw,
   Search,
@@ -22,7 +23,11 @@ import {
   AttendanceSummary,
   AttendancePagination,
   getAttendance,
+  getAttendanceForExport,
+  AttendanceExportParams,
 } from "@/lib/api/attendance.api";
+
+import { exportToExcel, exportToPDF } from "@/lib/utils/export";
 
 import { ATTENDANCE_READERS } from "@/app/modules/attendance/attendance.constants";
 
@@ -134,6 +139,7 @@ export default function AttendanceDetailsPage() {
    */
 
   const loadAttendance = useCallback(async () => {
+    setLoading(true);
     try {
       setError(null);
 
@@ -191,7 +197,6 @@ export default function AttendanceDetailsPage() {
    */
 
   useEffect(() => {
-    setLoading(true);
     loadAttendance();
   }, [loadAttendance]);
 
@@ -215,7 +220,7 @@ export default function AttendanceDetailsPage() {
         (statusFilter === "no_attendance" && !record.hasAttendance) ||
         (statusFilter === "late" && record.isLate) ||
         (statusFilter === "early_out" && record.isEarlyOut);
-
+      console.log('Employee:', record.employeeName, 'isLate:', record.isLate);
       const matchesEmployee =
         !query ||
         employeeId.toLowerCase().includes(query) ||
@@ -247,6 +252,11 @@ export default function AttendanceDetailsPage() {
   const lateCount = summary.late;
   const earlyOutCount = summary.earlyOut;
 
+  const now = new Date();
+
+  const time = now.toTimeString().slice(0, 8).replace(/:/g, "");
+  const dateForFilename = now.toISOString().slice(0, 10).replace(/-/g, "");
+  const filename = `attendance_${dateForFilename}_${time}.pdf`;
   /*
    * ========================================
    * Active filters
@@ -309,6 +319,122 @@ export default function AttendanceDetailsPage() {
 
   /*
    * ========================================
+   * Export handlers
+   * ========================================
+   */
+
+  const handleExportExcel = async () => {
+    try {
+      const exportParams: AttendanceExportParams = {
+        date,
+        search: search.trim() || undefined,
+        departmentId:
+          departmentFilter === "all" ? undefined : Number(departmentFilter),
+      };
+
+      const response = await getAttendanceForExport(exportParams);
+
+      if (!response.success) {
+        throw new Error(
+          response.message || "Failed to export attendance data."
+        );
+      }
+
+      const columns = [
+        { header: "SL No.", key: "serialNumber", width: 8 },
+        { header: "ID", key: "employeeId", width: 15 },
+        { header: "Employee", key: "employeeName", width: 25 },
+        { header: "Department", key: "departmentName", width: 20 },
+        { header: "First Punch", key: "firstPunch", width: 18 },
+        { header: "Last Punch", key: "lastPunch", width: 18 },
+        { header: "Stay Time", key: "stayTime", width: 14 },
+        { header: "Status", key: "attendanceStatus", width: 18 },
+      ];
+
+      const exportData = response.data.map((record, index) => ({
+        serialNumber: index + 1,
+        employeeId: record.employeeId,
+        employeeName: record.employeeName,
+        departmentName: record.departmentName ?? "—",
+        firstPunch: record.firstPunch ?? "—",
+        lastPunch: record.lastPunch ?? "—",
+        stayTime: record.stayTime ?? "00:00:00",
+        attendanceStatus: record.attendanceStatus,
+      }));
+
+      exportToExcel({
+        filename: filename,
+        sheetName: "Attendance",
+        columns,
+        data: exportData,
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Failed to export Excel.";
+      setError(message);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    try {
+      const exportParams: AttendanceExportParams = {
+        date,
+        search: search.trim() || undefined,
+        departmentId:
+          departmentFilter === "all" ? undefined : Number(departmentFilter),
+      };
+
+      const response = await getAttendanceForExport(exportParams);
+
+      if (!response.success) {
+        throw new Error(
+          response.message || "Failed to export attendance data."
+        );
+      }
+
+      const columns = [
+        { header: "SL No.", key: "serialNumber", width: 15 },
+        { header: "ID", key: "employeeId", width: 30 },
+        { header: "Employee", key: "employeeName", width: 45 },
+        { header: "Department", key: "departmentName", width: 35 },
+        { header: "First Punch", key: "firstPunch", width: 35 },
+        { header: "Last Punch", key: "lastPunch", width: 35 },
+        { header: "Stay Time", key: "stayTime", width: 25 },
+        { header: "Status", key: "attendanceStatus", width: 25 },
+      ];
+
+      const exportData = response.data.map((record, index) => ({
+        serialNumber: index + 1,
+        employeeId: record.employeeId,
+        employeeName: record.employeeName,
+        departmentName: record.departmentName ?? "—",
+        firstPunch: record.firstPunch ?? "—",
+        lastPunch: record.lastPunch ?? "—",
+        stayTime: record.stayTime ?? "00:00:00",
+        attendanceStatus: record.attendanceStatus,
+      }));
+
+      exportToPDF({
+        filename: filename,
+        columns,
+        data: exportData,
+        title: "Daily Attendance Report",
+        subtitle: `Date: ${date} | Total: ${response.total} employees`,
+      });
+
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Failed to export PDF.";
+      setError(message);
+    }
+  };
+
+  /*
+   * ========================================
    * Render
    * ========================================
    */
@@ -330,17 +456,39 @@ export default function AttendanceDetailsPage() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={handleRefresh}
-            disabled={loading || refreshing}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
-          >
-            <RefreshCw
-              className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
-            />
-            {refreshing ? "Refreshing..." : "Refresh"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              disabled={loading || filteredRecords.length === 0}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+            >
+              <Download className="h-4 w-4" />
+              Export Excel
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportPDF}
+              disabled={loading || filteredRecords.length === 0}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+            >
+              <Download className="h-4 w-4" />
+              Export PDF
+            </button>
+
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={loading || refreshing}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+              />
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </button>
+          </div>
         </section>
 
         {/* ================================= */}
@@ -860,11 +1008,10 @@ function AttendancePaginationControls({
             key={pageNumber}
             type="button"
             onClick={() => onPageChange(pageNumber)}
-            className={`min-w-9 rounded-lg px-3 py-2 text-sm font-medium transition ${
-              pageNumber === page
-                ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-                : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900"
-            }`}
+            className={`min-w-9 rounded-lg px-3 py-2 text-sm font-medium transition ${pageNumber === page
+              ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
+              : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900"
+              }`}
           >
             {pageNumber}
           </button>

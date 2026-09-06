@@ -6,12 +6,20 @@ import {
   ATTENDANCE_QUERY,
   ATTENDANCE_COUNT_QUERY,
   ATTENDANCE_SUMMARY_QUERY,
+  ATTENDANCE_EXPORT_QUERY,
 } from "./queries/attendance.query";
 
 import type {
   AttendanceFilters,
   AttendanceRecord,
 } from "./attendance.types";
+
+export interface ExportFilters {
+  date?: string;
+  employeeId?: string;
+  search?: string;
+  departmentId?: number | null;
+}
 
 interface AttendanceQueryRow {
   EmployeeID: string | number;
@@ -55,6 +63,9 @@ interface AttendanceSummaryRow {
   NoAttendance: number | string | null;
   Late: number | string | null;
   EarlyOut: number | string | null;
+}
+interface DepartmentRow {
+  DepartmentName: string;
 }
 
 export class AttendanceRepository {
@@ -404,7 +415,7 @@ export class AttendanceRepository {
     WHERE sName IS NOT NULL
     ORDER BY sName
   `);
-    return result.recordset.map((row: any) => row.DepartmentName);
+    return result.recordset.map((row: DepartmentRow) => row.DepartmentName);
   }
   /**
    * Converts SQL date/time values to a string.
@@ -469,6 +480,167 @@ export class AttendanceRepository {
         "0"
       ),
     ].join(":");
+  }
+
+  /**
+   * Find all daily attendance records for export (no pagination).
+   */
+  async findDailyAttendanceForExport(
+    filters: ExportFilters
+  ): Promise<{
+    records: AttendanceRecord[];
+    total: number;
+    summary: {
+      totalEmployees: number;
+      present: number;
+      noAttendance: number;
+      late: number;
+      earlyOut: number;
+    };
+  }> {
+    const pool = await getBioStarDB();
+
+    const date =
+      filters.date || null;
+
+    const employeeId =
+      filters.employeeId || null;
+
+    const search =
+      filters.search || null;
+
+    const departmentId =
+      filters.departmentId !== undefined &&
+        filters.departmentId !== null
+        ? filters.departmentId
+        : null;
+
+    const request = pool.request();
+
+    request.input(
+      "date",
+      sql.Date,
+      date
+    );
+
+    request.input(
+      "employeeId",
+      sql.VarChar(64),
+      employeeId
+    );
+
+    request.input(
+      "search",
+      sql.NVarChar(96),
+      search
+    );
+
+    request.input(
+      "departmentId",
+      sql.Int,
+      departmentId
+    );
+
+    // Query without pagination - get all records
+    const query = `
+      ${ATTENDANCE_EXPORT_QUERY}
+
+      ${ATTENDANCE_COUNT_QUERY}
+
+      ${ATTENDANCE_SUMMARY_QUERY}
+    `;
+
+    const result = await request.batch(query);
+
+    const recordsets =
+      result.recordsets as unknown as [
+        AttendanceQueryRow[],
+        AttendanceCountRow[],
+        AttendanceSummaryRow[]
+      ];
+
+    const attendanceResult =
+      recordsets[0] ?? [];
+
+    const countResult =
+      recordsets[1] ?? [];
+
+    const total =
+      Number(
+        countResult[0]?.Total ?? 0
+      );
+
+    const summaryResult =
+      recordsets[2] ?? [];
+
+    const summaryRow =
+      summaryResult[0];
+
+    const summary = {
+      totalEmployees:
+        Number(
+          summaryRow?.TotalEmployees ?? 0
+        ),
+
+      present:
+        Number(
+          summaryRow?.Present ?? 0
+        ),
+
+      noAttendance:
+        Number(
+          summaryRow?.NoAttendance ?? 0
+        ),
+
+      late:
+        Number(
+          summaryRow?.Late ?? 0
+        ),
+
+      earlyOut:
+        Number(
+          summaryRow?.EarlyOut ?? 0
+        ),
+    };
+
+    const records: AttendanceRecord[] = attendanceResult.map((row) => {
+      const totalPunches = Number(row.TotalPunches ?? 0);
+      const staySeconds = Number(row.StaySeconds ?? 0);
+      const hasAttendance = totalPunches > 0;
+      const isPresent = hasAttendance;
+
+      // ✅ FIX: read the computed IsLate column from the SQL
+      const isLate = Boolean(Number(row.IsLate));
+
+      // EarlyOut remains from nEarlyOutTime (or you can compute it similarly)
+      const isEarlyOut = Number(row.nEarlyOutTime ?? 0) > 0;
+
+      const attendanceStatus = !hasAttendance ? "No Attendance" : "Present";
+
+      return {
+        employeeId: String(row.EmployeeID),
+        employeeName: row.EmployeeName ?? "Unknown",
+        departmentId: row.DepartmentID !== null && row.DepartmentID !== undefined ? Number(row.DepartmentID) : null,
+        departmentName: row.DepartmentName ?? null,
+        attendanceDate: this.formatDateTime(row.AttendanceDate),
+        firstPunch: this.formatDateTime(row.FirstPunch),
+        firstPunchReader: row.FirstPunchReader ?? "",
+        lastPunch: this.formatDateTime(row.LastPunch),
+        lastPunchReader: row.LastPunchReader ?? "",
+        totalPunches,
+        stayTime: this.formatDuration(staySeconds),
+        hasAttendance,
+        isPresent,
+        isLate,        // now uses the computed value
+        isEarlyOut,
+        attendanceStatus,
+      };
+    });
+    return {
+      records,
+      total,
+      summary,
+    };
   }
 }
 
