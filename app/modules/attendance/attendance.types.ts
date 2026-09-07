@@ -44,6 +44,9 @@ export interface AttendanceFilters {
   employeeId?: string;
   search?: string;
   departmentId?: number;
+  reader?: string;
+  readerId?: number;
+  status?: string;
   page: number;
   pageSize: number;
 }

@@ -308,6 +308,12 @@ FinalData AS
             OR P.AttendanceDate = @date
         )
 
+    LEFT JOIN TB_READER R_First
+        ON R_First.nReaderIdn = P.FirstPunchReader
+
+    LEFT JOIN TB_READER R_Last
+        ON R_Last.nReaderIdn = P.LastPunchReader
+
     WHERE
         (
             @employeeId IS NULL
@@ -327,6 +333,20 @@ FinalData AS
         (
             @departmentId IS NULL
             OR E.DepartmentID = @departmentId
+        )
+
+        AND
+        (
+            @readerId IS NULL
+            OR P.FirstPunchReader = @readerId
+            OR P.LastPunchReader = @readerId
+        )
+
+        AND
+        (
+            @reader IS NULL
+            OR R_First.sName = @reader
+            OR R_Last.sName = @reader
         )
 )
 
@@ -708,6 +728,12 @@ FinalData AS
             OR P.AttendanceDate = @date
         )
 
+    LEFT JOIN TB_READER R_First
+        ON R_First.nReaderIdn = P.FirstPunchReader
+
+    LEFT JOIN TB_READER R_Last
+        ON R_Last.nReaderIdn = P.LastPunchReader
+
     WHERE
         (
             @employeeId IS NULL
@@ -727,6 +753,20 @@ FinalData AS
         (
             @departmentId IS NULL
             OR E.DepartmentID = @departmentId
+        )
+
+        AND
+        (
+            @readerId IS NULL
+            OR P.FirstPunchReader = @readerId
+            OR P.LastPunchReader = @readerId
+        )
+
+        AND
+        (
+            @reader IS NULL
+            OR R_First.sName = @reader
+            OR R_Last.sName = @reader
         )
 )
 

@@ -78,7 +78,7 @@ export interface AttendanceParams {
   pageSize?: number;
 
   /*
-   * Employee search
+   * Employee search (ID or name)
    */
   search?: string;
 
@@ -86,6 +86,17 @@ export interface AttendanceParams {
    * Department filter
    */
   departmentId?: number;
+
+  /*
+   * Status filter
+   *
+   * Possible values:
+   * present
+   * no_attendance
+   * late
+   * early_out
+   */
+  status?: string;
 
   /*
    * Reader filter
@@ -98,16 +109,9 @@ export interface AttendanceParams {
   reader?: string;
 
   /*
-   * Status filter
-   *
-   * Possible values:
-   *
-   * present
-   * no_attendance
-   * late
-   * early_out
+   * Reader ID filter (numeric)
    */
-  status?: string;
+  readerId?: number;
 }
 
 /**
@@ -240,7 +244,7 @@ export async function getAttendance(
 
   /*
    * ----------------------------------------
-   * Reader
+   * Reader (by name)
    * ----------------------------------------
    */
 
@@ -252,6 +256,16 @@ export async function getAttendance(
       "reader",
       params.reader
     );
+  }
+
+  /*
+   * ----------------------------------------
+   * Reader (by ID - numeric)
+   * ----------------------------------------
+   */
+
+  if (params.readerId !== undefined) {
+    searchParams.set("readerId", String(params.readerId));
   }
 
   /*

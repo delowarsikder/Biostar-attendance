@@ -23,7 +23,7 @@ export class AttendanceService {
         total: result.total,
         totalPages,
       },
-      departments, // <-- include all departments
+      departments,
     };
   }
 }

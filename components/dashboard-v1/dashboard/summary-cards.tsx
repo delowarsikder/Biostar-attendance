@@ -5,6 +5,7 @@ import {
   Activity,
   CalendarCheck,
   Clock3,
+  ClockAlert,
   Users,
 } from "lucide-react";
 
@@ -50,16 +51,16 @@ export default function SummaryCards() {
         });
 
         if (response.success && response.summary) {
-          // Calculate total punches from summary
-          const totalPunches = response.summary.present; // rough estimate
-
           setData({
             totalEmployees: response.summary.totalEmployees,
             present: response.summary.present,
             noAttendance: response.summary.noAttendance,
             late: response.summary.late,
             earlyOut: response.summary.earlyOut,
-            totalPunches: response.summary.present + response.summary.late + response.summary.earlyOut,
+            totalPunches:
+              response.summary.present +
+              response.summary.late +
+              response.summary.earlyOut,
           });
         }
       } catch (err) {
@@ -92,6 +93,18 @@ export default function SummaryCards() {
       icon: Users,
     },
     {
+      title: "Late Today",
+      value: loading ? "—" : data.late.toString(),
+      description: "Checked in after 09:00",
+      icon: ClockAlert,
+    },
+    {
+      title: "Early Out",
+      value: loading ? "—" : data.earlyOut.toString(),
+      description: "Left before shift end",
+      icon: Clock3,
+    },
+    {
       title: "Total Punches",
       value: loading ? "—" : data.totalPunches.toString(),
       description: "Valid attendance punches",
@@ -100,7 +113,7 @@ export default function SummaryCards() {
   ];
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
       {cards.map((card) => {
         const Icon = card.icon;
 

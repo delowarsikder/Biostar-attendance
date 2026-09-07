@@ -88,7 +88,7 @@ export default function AttendanceDetailsPage() {
   const [search, setSearch] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [readerFilter, setReaderFilter] = useState("all");
+  const [readerFilter, setReaderFilter] = useState<number | "all">("all");
 
   // Pagination
   const [page, setPage] = useState(1);
@@ -144,10 +144,29 @@ export default function AttendanceDetailsPage() {
       setError(null);
 
       if (process.env.NODE_ENV === "development") {
-        console.log("📤 Fetching attendance with:", { date, page, pageSize });
+        console.log("📤 Fetching attendance with:", {
+          date,
+          page,
+          pageSize,
+          search,
+          departmentFilter,
+          statusFilter,
+          readerFilter,
+        });
       }
 
-      const response = await getAttendance({ date, page, pageSize });
+      const response = await getAttendance({
+        date,
+        page,
+        pageSize,
+        search: search.trim() || undefined,
+        departmentId:
+          departmentFilter === "all" ? undefined : Number(departmentFilter),
+        status:
+          statusFilter === "all" ? undefined : statusFilter,
+        readerId:
+          readerFilter === "all" ? undefined : readerFilter,
+      });
 
       if (process.env.NODE_ENV === "development") {
         console.log("📥 API response:", response);
@@ -188,7 +207,7 @@ export default function AttendanceDetailsPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [date, page]);
+  }, [date, page, search, departmentFilter, statusFilter, readerFilter]);
 
   /*
    * ----------------------------------------
@@ -199,46 +218,6 @@ export default function AttendanceDetailsPage() {
   useEffect(() => {
     loadAttendance();
   }, [loadAttendance]);
-
-  /*
-   * ========================================
-   * Client-side filtering
-   * ========================================
-   */
-
-  const filteredRecords = useMemo(() => {
-    const query = search.trim().toLowerCase();
-
-    return records.filter((record) => {
-      const employeeId = String(record.employeeId ?? "");
-      const employeeName = String(record.employeeName ?? "");
-      const department = String(record.departmentName ?? "");
-
-      const matchesStatus =
-        statusFilter === "all" ||
-        (statusFilter === "present" && record.isPresent) ||
-        (statusFilter === "no_attendance" && !record.hasAttendance) ||
-        (statusFilter === "late" && record.isLate) ||
-        (statusFilter === "early_out" && record.isEarlyOut);
-      console.log('Employee:', record.employeeName, 'isLate:', record.isLate);
-      const matchesEmployee =
-        !query ||
-        employeeId.toLowerCase().includes(query) ||
-        employeeName.toLowerCase().includes(query);
-
-      const matchesDepartment =
-        departmentFilter === "all" || department === departmentFilter;
-
-      const matchesReader =
-        readerFilter === "all" ||
-        String(record.firstPunchReader ?? "") === readerFilter ||
-        String(record.lastPunchReader ?? "") === readerFilter;
-
-      return (
-        matchesEmployee && matchesDepartment && matchesStatus && matchesReader
-      );
-    });
-  }, [records, search, departmentFilter, statusFilter, readerFilter]);
 
   /*
    * ========================================
@@ -460,7 +439,7 @@ export default function AttendanceDetailsPage() {
             <button
               type="button"
               onClick={handleExportExcel}
-              disabled={loading || filteredRecords.length === 0}
+              disabled={loading || records.length === 0}
               className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
             >
               <Download className="h-4 w-4" />
@@ -470,7 +449,7 @@ export default function AttendanceDetailsPage() {
             <button
               type="button"
               onClick={handleExportPDF}
-              disabled={loading || filteredRecords.length === 0}
+              disabled={loading || records.length === 0}
               className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
             >
               <Download className="h-4 w-4" />
@@ -641,9 +620,10 @@ export default function AttendanceDetailsPage() {
               <div className="relative">
                 <select
                   id="reader-filter"
-                  value={readerFilter}
+                  value={String(readerFilter)}
                   onChange={(event) => {
-                    setReaderFilter(event.target.value);
+                    const value = event.target.value;
+                    setReaderFilter(value === "all" ? "all" : Number(value));
                     setPage(1);
                   }}
                   className="h-10 w-full appearance-none rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-slate-600 dark:focus:ring-slate-800"
@@ -761,8 +741,8 @@ export default function AttendanceDetailsPage() {
                 Daily Attendance
               </h2>
               <p className="text-xs text-slate-500">
-                {filteredRecords.length}{" "}
-                {filteredRecords.length === 1 ? "employee" : "employees"}
+                {records.length}{" "}
+                {records.length === 1 ? "employee" : "employees"}
               </p>
             </div>
             <div className="text-xs text-slate-500">{date}</div>
@@ -770,7 +750,7 @@ export default function AttendanceDetailsPage() {
 
           {loading ? (
             <LoadingTable />
-          ) : filteredRecords.length === 0 ? (
+          ) : records.length === 0 ? (
             <EmptyState hasFilters={hasActiveFilters} onClear={clearFilters} />
           ) : (
             <div className="overflow-x-auto">
@@ -791,7 +771,7 @@ export default function AttendanceDetailsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {filteredRecords.map((record, index) => (
+                  {records.map((record, index) => (
                     <AttendanceRow
                       key={record.employeeId}
                       record={record}

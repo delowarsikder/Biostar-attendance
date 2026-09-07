@@ -115,6 +115,15 @@ export class AttendanceRepository {
         ? filters.departmentId
         : null;
 
+    const readerId =
+      filters.readerId !== undefined &&
+        filters.readerId !== null
+        ? filters.readerId
+        : null;
+
+    const reader =
+      filters.reader?.trim() || null;
+
     /*
      * Create SQL request.
      */
@@ -154,6 +163,24 @@ export class AttendanceRepository {
       "departmentId",
       sql.Int,
       departmentId
+    );
+
+    /*
+     * Reader ID (numeric).
+     */
+    request.input(
+      "readerId",
+      sql.Int,
+      readerId
+    );
+
+    /*
+     * Reader (name).
+     */
+    request.input(
+      "reader",
+      sql.NVarChar(100),
+      reader
     );
 
     /*
