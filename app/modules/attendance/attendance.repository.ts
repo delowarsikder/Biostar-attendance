@@ -19,6 +19,7 @@ export interface ExportFilters {
   employeeId?: string;
   search?: string;
   departmentId?: number | null;
+  departmentName?: string | null;
 }
 
 interface AttendanceQueryRow {
@@ -64,6 +65,7 @@ interface AttendanceSummaryRow {
   Late: number | string | null;
   EarlyOut: number | string | null;
 }
+
 interface DepartmentRow {
   DepartmentName: string;
 }
@@ -115,6 +117,9 @@ export class AttendanceRepository {
         ? filters.departmentId
         : null;
 
+    const departmentName =
+      filters.departmentName?.trim() || null;
+
     const readerId =
       filters.readerId !== undefined &&
         filters.readerId !== null
@@ -157,12 +162,21 @@ export class AttendanceRepository {
     );
 
     /*
-     * Department.
+     * Department (by ID).
      */
     request.input(
       "departmentId",
       sql.Int,
       departmentId
+    );
+
+    /*
+     * Department (by name).
+     */
+    request.input(
+      "departmentName",
+      sql.NVarChar(100),
+      departmentName
     );
 
     /*
@@ -332,7 +346,7 @@ export class AttendanceRepository {
          */
         const isLate =
           Number(
-            row.nLateInTime ?? 0
+            row.IsLate ?? 0
           ) > 0;
 
         /*
@@ -340,7 +354,7 @@ export class AttendanceRepository {
          */
         const isEarlyOut =
           Number(
-            row.nEarlyOutTime ?? 0
+            row.IsEarlyOut ?? 0
           ) > 0;
 
         /*
@@ -415,98 +429,87 @@ export class AttendanceRepository {
         };
       });
 
-    /*
-     * Final response.
-     *
-     * `records` = current page only.
-     *
-     * `total` = all filtered employees.
-     *
-     * `summary` = all filtered employees,
-     *              NOT just the current page.
-     */
     return {
       records,
       total,
       summary,
     };
   }
-  // app/modules/attendance/attendance.repository.ts
 
-  // Add this method
-  async getDepartments(): Promise<string[]> {
+  /**
+   * Get filtered departments for the dropdown.
+   * Only returns departments that have employees matching the current filters.
+   */
+  async getDepartments(
+    filters?: Pick<
+      AttendanceFilters,
+      "date" | "search" | "readerId" | "reader" | "status"
+    >
+  ): Promise<string[]> {
     const pool = await getBioStarDB();
-    const result = await pool.request().query(`
-    SELECT DISTINCT sName AS DepartmentName
-    FROM TB_USER_DEPT
-    WHERE sName IS NOT NULL
-    ORDER BY sName
-  `);
+
+    const date = filters?.date || null;
+    const search = filters?.search?.trim() || null;
+    const readerId = filters?.readerId ?? null;
+    const reader = filters?.reader?.trim() || null;
+
+    const request = pool.request();
+
+    request.input("date", sql.Date, date);
+    request.input("search", sql.NVarChar(96), search);
+    request.input("readerId", sql.Int, readerId);
+    request.input("reader", sql.NVarChar(100), reader);
+
+    let query = `
+      SELECT DISTINCT D.sName AS DepartmentName
+      FROM TB_USER_DEPT D
+      WHERE D.sName IS NOT NULL
+        AND EXISTS (
+          SELECT 1
+          FROM TB_USER U
+          WHERE U.nDepartmentIdn = D.nDepartmentIdn
+            AND U.sUserID IS NOT NULL
+    `;
+
+    if (search) {
+      query += `
+            AND (U.sUserID LIKE '%' + @search + '%' OR U.sUserName LIKE '%' + @search + '%')
+      `;
+    }
+
+    if (readerId) {
+      query += `
+            AND EXISTS (
+              SELECT 1 FROM TB_EVENT_LOG E
+              INNER JOIN TB_READER R ON E.nReaderIdn = R.nReaderIdn
+              WHERE CAST(E.nUserID AS VARCHAR(64)) = U.sUserID
+                AND E.nEventIdn = 55
+                AND E.nReaderIdn = @readerId
+                AND CAST(DATEADD(SECOND, E.nDateTime, '1970-01-01') AS DATE) = CAST(@date AS DATE)
+            )
+      `;
+    }
+
+    if (reader) {
+      query += `
+            AND EXISTS (
+              SELECT 1 FROM TB_EVENT_LOG E
+              INNER JOIN TB_READER R ON E.nReaderIdn = R.nReaderIdn
+              WHERE CAST(E.nUserID AS VARCHAR(64)) = U.sUserID
+                AND E.nEventIdn = 55
+                AND R.sName = @reader
+                AND CAST(DATEADD(SECOND, E.nDateTime, '1970-01-01') AS DATE) = CAST(@date AS DATE)
+            )
+      `;
+    }
+
+    query += `
+          )
+        ORDER BY D.sName
+    `;
+
+    const result = await request.query(query);
     return result.recordset.map((row: DepartmentRow) => row.DepartmentName);
-  }
-  /**
-   * Converts SQL date/time values to a string.
-   */
-  private formatDateTime(
-    value: Date | string | null
-  ): string {
-    return value
-      ? String(value)
-      : "";
-  }
-
-  /**
-   * Converts seconds into HH:mm:ss.
-   *
-   * Example:
-   *
-   * 0    -> 00:00:00
-   * 4    -> 00:00:04
-   * 60   -> 00:01:00
-   * 3600 -> 01:00:00
-   */
-  private formatDuration(
-    totalSeconds: number
-  ): string {
-    const seconds =
-      Math.max(
-        0,
-        Math.floor(
-          totalSeconds || 0
-        )
-      );
-
-    const hours =
-      Math.floor(
-        seconds / 3600
-      );
-
-    const minutes =
-      Math.floor(
-        (seconds % 3600) / 60
-      );
-
-    const remainingSeconds =
-      seconds % 60;
-
-    return [
-      String(hours).padStart(
-        2,
-        "0"
-      ),
-
-      String(minutes).padStart(
-        2,
-        "0"
-      ),
-
-      String(
-        remainingSeconds
-      ).padStart(
-        2,
-        "0"
-      ),
-    ].join(":");
   }
 
   /**
@@ -525,6 +528,7 @@ export class AttendanceRepository {
       earlyOut: number;
     };
   }> {
+    console.log("🔍 findDailyAttendanceForExport called with filters:", filters);
     const pool = await getBioStarDB();
 
     const date =
@@ -541,6 +545,9 @@ export class AttendanceRepository {
         filters.departmentId !== null
         ? filters.departmentId
         : null;
+
+    const departmentName =
+      filters.departmentName?.trim() || null;
 
     const request = pool.request();
 
@@ -630,44 +637,160 @@ export class AttendanceRepository {
         ),
     };
 
-    const records: AttendanceRecord[] = attendanceResult.map((row) => {
-      const totalPunches = Number(row.TotalPunches ?? 0);
-      const staySeconds = Number(row.StaySeconds ?? 0);
-      const hasAttendance = totalPunches > 0;
-      const isPresent = hasAttendance;
+    const records: AttendanceRecord[] =
+      attendanceResult.map((row) => {
+        const totalPunches =
+          Number(
+            row.TotalPunches ?? 0
+          );
 
-      // ✅ FIX: read the computed IsLate column from the SQL
-      const isLate = Boolean(Number(row.IsLate));
+        const staySeconds =
+          Number(
+            row.StaySeconds ?? 0
+          );
 
-      // EarlyOut remains from nEarlyOutTime (or you can compute it similarly)
-      const isEarlyOut = Number(row.nEarlyOutTime ?? 0) > 0;
+        const hasAttendance =
+          totalPunches > 0;
 
-      const attendanceStatus = !hasAttendance ? "No Attendance" : "Present";
+        const isPresent =
+          hasAttendance;
 
-      return {
-        employeeId: String(row.EmployeeID),
-        employeeName: row.EmployeeName ?? "Unknown",
-        departmentId: row.DepartmentID !== null && row.DepartmentID !== undefined ? Number(row.DepartmentID) : null,
-        departmentName: row.DepartmentName ?? null,
-        attendanceDate: this.formatDateTime(row.AttendanceDate),
-        firstPunch: this.formatDateTime(row.FirstPunch),
-        firstPunchReader: row.FirstPunchReader ?? "",
-        lastPunch: this.formatDateTime(row.LastPunch),
-        lastPunchReader: row.LastPunchReader ?? "",
-        totalPunches,
-        stayTime: this.formatDuration(staySeconds),
-        hasAttendance,
-        isPresent,
-        isLate,        // now uses the computed value
-        isEarlyOut,
-        attendanceStatus,
-      };
-    });
+        const isLate =
+          Number(
+            row.IsLate ?? 0
+          ) > 0;
+
+        const isEarlyOut =
+          Number(
+            row.IsEarlyOut ?? 0
+          ) > 0;
+
+        const attendanceStatus =
+          !hasAttendance
+            ? "No Attendance"
+            : "Present";
+
+        return {
+          employeeId:
+            String(
+              row.EmployeeID
+            ),
+
+          employeeName:
+            row.EmployeeName ??
+            "Unknown",
+
+          departmentId:
+            row.DepartmentID !== null &&
+              row.DepartmentID !== undefined
+              ? Number(
+                row.DepartmentID
+              )
+              : null,
+
+          departmentName:
+            row.DepartmentName ??
+            null,
+
+          attendanceDate:
+            this.formatDateTime(
+              row.AttendanceDate
+            ),
+
+          firstPunch:
+            this.formatDateTime(
+              row.FirstPunch
+            ),
+
+          firstPunchReader:
+            row.FirstPunchReader ??
+            "",
+
+          lastPunch:
+            this.formatDateTime(
+              row.LastPunch
+            ),
+
+          lastPunchReader:
+            row.LastPunchReader ??
+            "",
+
+          totalPunches,
+
+          stayTime:
+            this.formatDuration(
+              staySeconds
+            ),
+
+          hasAttendance,
+
+          isPresent,
+
+          isLate,
+
+          isEarlyOut,
+
+          attendanceStatus,
+        };
+      });
+
     return {
       records,
       total,
       summary,
     };
+  }
+
+  /**
+   * Converts SQL date/time values to a string.
+   */
+  private formatDateTime(
+    value: Date | string | null
+  ): string {
+    return value
+      ? String(value)
+      : "";
+  }
+
+  /**
+   * Converts seconds into HH:mm:ss.
+   *
+   * Example:
+   *
+   * 0    -> 00:00:00
+   * 4    -> 00:00:04
+   * 60   -> 00:01:00
+   * 3600 -> 01:00:00
+   */
+  private formatDuration(
+    totalSeconds: number
+  ): string {
+    const seconds =
+      Math.max(
+        0,
+        Math.floor(
+          totalSeconds || 0
+        )
+      );
+
+    const hours =
+      Math.floor(
+        seconds / 3600
+      );
+
+    const minutes =
+      Math.floor(
+        (seconds % 3600) / 60
+      );
+
+    const remainingSeconds =
+      seconds % 60;
+
+    return [
+      String(hours).padStart(2, "0"),
+      String(minutes).padStart(2, "0"),
+      String(remainingSeconds).padStart(2, "0"),
+    ].join(":");
   }
 }
 

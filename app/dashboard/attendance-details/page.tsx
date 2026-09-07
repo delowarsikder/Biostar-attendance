@@ -2,35 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  CalendarDays,
-  CheckCircle2,
-  ChevronDown,
-  Clock3,
-  ClockAlert,
-  Download,
-  Filter,
-  RefreshCw,
-  Search,
-  UserX,
-  Users,
-  X,
+  CalendarDays, CheckCircle2, ChevronDown, Clock3, ClockAlert, Download, Filter, RefreshCw, Search, UserX, Users, X,
 } from "lucide-react";
-
 import DashboardShell from "@/components/dashboard-v1/layout/dashboard-shell";
 
-import {
-  AttendanceRecord,
-  AttendanceSummary,
-  AttendancePagination,
-  getAttendance,
-  getAttendanceForExport,
-  AttendanceExportParams,
-} from "@/lib/api/attendance.api";
-
+import { AttendanceRecord, AttendanceSummary, AttendancePagination, getAttendance, getAttendanceForExport, AttendanceExportParams, } from "@/lib/api/attendance.api";
 import { exportToExcel, exportToPDF } from "@/lib/utils/export";
-
 import { ATTENDANCE_READERS } from "@/app/modules/attendance/attendance.constants";
-
 /*
  * ========================================
  * Today
@@ -160,8 +138,8 @@ export default function AttendanceDetailsPage() {
         page,
         pageSize,
         search: search.trim() || undefined,
-        departmentId:
-          departmentFilter === "all" ? undefined : Number(departmentFilter),
+        departmentName:
+          departmentFilter === "all" ? undefined : departmentFilter,
         status:
           statusFilter === "all" ? undefined : statusFilter,
         readerId:
@@ -235,7 +213,7 @@ export default function AttendanceDetailsPage() {
 
   const time = now.toTimeString().slice(0, 8).replace(/:/g, "");
   const dateForFilename = now.toISOString().slice(0, 10).replace(/-/g, "");
-  const filename = `attendance_${dateForFilename}_${time}.pdf`;
+  const filename = `${dateForFilename}_attendance_${time}`;
   /*
    * ========================================
    * Active filters
@@ -307,8 +285,8 @@ export default function AttendanceDetailsPage() {
       const exportParams: AttendanceExportParams = {
         date,
         search: search.trim() || undefined,
-        departmentId:
-          departmentFilter === "all" ? undefined : Number(departmentFilter),
+        departmentName:
+          departmentFilter === "all" ? undefined : departmentFilter,
       };
 
       const response = await getAttendanceForExport(exportParams);
@@ -361,8 +339,7 @@ export default function AttendanceDetailsPage() {
       const exportParams: AttendanceExportParams = {
         date,
         search: search.trim() || undefined,
-        departmentId:
-          departmentFilter === "all" ? undefined : Number(departmentFilter),
+        departmentName: departmentFilter === "all" ? undefined : departmentFilter,
       };
 
       const response = await getAttendanceForExport(exportParams);
@@ -420,12 +397,12 @@ export default function AttendanceDetailsPage() {
 
   return (
     <DashboardShell>
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* ================================= */}
         {/* Page Header */}
         {/* ================================= */}
 
-        <section className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <section className="flex flex-col gap-1 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
               Attendance Details
@@ -433,40 +410,6 @@ export default function AttendanceDetailsPage() {
             <p className="mt-1 text-sm text-slate-500">
               View daily employee attendance and punch information.
             </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleExportExcel}
-              disabled={loading || records.length === 0}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
-            >
-              <Download className="h-4 w-4" />
-              Export Excel
-            </button>
-
-            <button
-              type="button"
-              onClick={handleExportPDF}
-              disabled={loading || records.length === 0}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
-            >
-              <Download className="h-4 w-4" />
-              Export PDF
-            </button>
-
-            <button
-              type="button"
-              onClick={handleRefresh}
-              disabled={loading || refreshing}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
-            >
-              <RefreshCw
-                className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
-              />
-              {refreshing ? "Refreshing..." : "Refresh"}
-            </button>
           </div>
         </section>
 
@@ -482,16 +425,40 @@ export default function AttendanceDetailsPage() {
                 Filters
               </h2>
             </div>
-            {hasActiveFilters && (
+
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={clearFilters}
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                onClick={handleExportExcel}
+                disabled={loading || records.length === 0}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
               >
-                <X className="h-3.5 w-3.5" />
-                Clear filters
+                <Download className="h-4 w-4" />
+                Export Excel
               </button>
-            )}
+
+              <button
+                type="button"
+                onClick={handleExportPDF}
+                disabled={loading || records.length === 0}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+              >
+                <Download className="h-4 w-4" />
+                Export PDF
+              </button>
+
+              <button
+                type="button"
+                onClick={handleRefresh}
+                disabled={loading || refreshing}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+              >
+                <RefreshCw
+                  className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+                />
+                {refreshing ? "Refreshing..." : "Refresh"}
+              </button>
+            </div>
           </div>
 
           <div className="grid gap-4 p-2 lg:grid-cols-[1.1fr_1.4fr_1.2fr_1fr_1.4fr_auto] lg:items-end">
@@ -571,7 +538,12 @@ export default function AttendanceDetailsPage() {
                   className="h-10 w-full appearance-none rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-slate-600 dark:focus:ring-slate-800"
                 >
                   <option value="all">All Departments</option>
-                  {departmentOptions.map((department) => (
+                  {Array.from(
+                    new Set([
+                      ...departmentOptions,
+                      ...(departmentFilter !== "all" ? [departmentFilter] : []),
+                    ])
+                  ).map((department) => (
                     <option key={department} value={department}>
                       {department}
                     </option>
@@ -648,7 +620,7 @@ export default function AttendanceDetailsPage() {
                 className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
               >
                 <X className="h-4 w-4" />
-                Clear
+                Clear Filters
               </button>
             </div>
           </div>

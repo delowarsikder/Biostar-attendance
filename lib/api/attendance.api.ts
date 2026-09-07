@@ -45,15 +45,10 @@ export interface AttendancePagination {
 
 export interface AttendanceResponse {
   success: boolean;
-
   data: AttendanceRecord[];
-
   summary: AttendanceSummary;
-
   pagination: AttendancePagination;
-
   departments: string[];
-
   message?: string;
 }
 
@@ -83,9 +78,14 @@ export interface AttendanceParams {
   search?: string;
 
   /*
-   * Department filter
+   * Department filter (by ID)
    */
   departmentId?: number;
+
+  /*
+   * Department filter (by name)
+   */
+  departmentName?: string;
 
   /*
    * Status filter
@@ -134,7 +134,7 @@ export interface AttendanceExportParams {
   date: string;
   employeeId?: string;
   search?: string;
-  departmentId?: number;
+  departmentName?: string;
 }
 
 export interface AttendanceExportResponse {
@@ -160,10 +160,10 @@ export async function getAttendanceForExport(
     searchParams.set("search", params.search.trim());
   }
 
-  if (params.departmentId !== undefined) {
-    searchParams.set("departmentId", String(params.departmentId));
+  if (params.departmentName?.trim()) {
+    searchParams.set("departmentName", params.departmentName.trim());
   }
-
+  console.log("Exporting attendance with params:", params);
   return apiClient<AttendanceExportResponse>(
     `/api/v1/daily/attendance/export?${searchParams.toString()}`
   );
@@ -229,7 +229,7 @@ export async function getAttendance(
 
   /*
    * ----------------------------------------
-   * Department
+   * Department (by ID)
    * ----------------------------------------
    */
 
@@ -239,6 +239,22 @@ export async function getAttendance(
     searchParams.set(
       "departmentId",
       String(params.departmentId)
+    );
+  }
+
+  /*
+   * ----------------------------------------
+   * Department (by name)
+   * ----------------------------------------
+   */
+
+  if (
+    params.departmentName &&
+    params.departmentName.trim()
+  ) {
+    searchParams.set(
+      "departmentName",
+      params.departmentName.trim()
     );
   }
 

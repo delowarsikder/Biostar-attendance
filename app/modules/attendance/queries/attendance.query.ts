@@ -337,6 +337,12 @@ FinalData AS
 
         AND
         (
+            @departmentName IS NULL
+            OR E.DepartmentName = @departmentName
+        )
+
+        AND
+        (
             @readerId IS NULL
             OR P.FirstPunchReader = @readerId
             OR P.LastPunchReader = @readerId
@@ -753,6 +759,12 @@ FinalData AS
         (
             @departmentId IS NULL
             OR E.DepartmentID = @departmentId
+        )
+
+        AND
+        (
+            @departmentName IS NULL
+            OR E.DepartmentName = @departmentName
         )
 
         AND

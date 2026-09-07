@@ -50,8 +50,9 @@ export function exportToPDF(options: ExportOptions) {
   const doc = new jsPDF({
     orientation: columns.length > 7 ? "landscape" : "portrait",
     unit: "mm",
-    format: "a4",
+    format: "A4",
   });
+  console.log("Exporting to PDF with options:", options);
 
   let yPos = 15;
 

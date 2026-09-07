@@ -350,6 +350,7 @@ export default function EventsLogPage() {
         { header: "Time", key: "time", width: 12 },
         { header: "Employee ID", key: "employeeId", width: 15 },
         { header: "Employee Name", key: "employeeName", width: 25 },
+        { header: "Department", key: "departmentName", width: 20 },
         { header: "Reader", key: "readerName", width: 20 },
         { header: "Reader IP", key: "readerIp", width: 18 },
         { header: "Direction", key: "direction", width: 12 },
@@ -365,6 +366,7 @@ export default function EventsLogPage() {
           time: record.time,
           employeeId: record.employeeId,
           employeeName: record.employeeName,
+          // employeeDepartment: record.employeeDepartment,
           readerName: record.readerName,
           readerIp: reader?.ip ?? "—",
           direction: record.direction,
@@ -375,7 +377,7 @@ export default function EventsLogPage() {
       });
 
       exportToExcel({
-        filename: `events-log_${date.replace(/-/g, "")}`,
+        filename: `${date.replace(/-/g, "")}_events-log_${new Date().toTimeString().slice(0, 8).replace(/:/g, "")}`,
         sheetName: "Events Log",
         columns,
         data: exportData,
@@ -413,6 +415,7 @@ export default function EventsLogPage() {
         { header: "Time", key: "time", width: 25 },
         { header: "Employee ID", key: "employeeId", width: 30 },
         { header: "Employee", key: "employeeName", width: 40 },
+        { header: "Department", key: "departmentName", width: 40 },
         { header: "Reader", key: "readerName", width: 30 },
         { header: "Reader IP", key: "readerIp", width: 30 },
         { header: "Direction", key: "direction", width: 20 },
@@ -428,6 +431,7 @@ export default function EventsLogPage() {
           time: record.time,
           employeeId: record.employeeId,
           employeeName: record.employeeName,
+          // departmentName: record.departmentName ?? "—",
           readerName: record.readerName,
           readerIp: reader?.ip ?? "—",
           direction: record.direction,
@@ -438,7 +442,7 @@ export default function EventsLogPage() {
       });
 
       exportToPDF({
-        filename: `events-log_${date.replace(/-/g, "")}`,
+        filename: `${date.replace(/-/g, "")}_events-log_${new Date().toTimeString().slice(0, 8).replace(/:/g, "")}`,
         columns,
         data: exportData,
         title: "Daily Events Log Report",

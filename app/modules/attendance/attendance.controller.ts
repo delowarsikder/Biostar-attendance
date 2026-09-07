@@ -43,6 +43,10 @@ export async function getAttendance(
         ? Number(departmentIdValue)
         : undefined;
 
+    // Also accept departmentName for frontend convenience (dropdown uses names)
+    const departmentName =
+      searchParams.get("departmentName")?.trim() || undefined;
+
     const reader =
       searchParams.get("reader")?.trim() || undefined;
 
@@ -139,6 +143,7 @@ export async function getAttendance(
         employeeId,
         search,
         departmentId,
+        departmentName,
         reader,
         readerId,
         status,

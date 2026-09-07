@@ -5,10 +5,16 @@ import type { AttendanceFilters, AttendanceResponse } from "./attendance.types";
 
 export class AttendanceService {
   async getAttendance(filters: AttendanceFilters): Promise<AttendanceResponse> {
-    // Fetch attendance data and departments in parallel
+    // Fetch attendance data and filtered departments in parallel
     const [result, departments] = await Promise.all([
       attendanceRepository.findDailyAttendance(filters),
-      attendanceRepository.getDepartments(),
+      attendanceRepository.getDepartments({
+        date: filters.date,
+        search: filters.search,
+        readerId: filters.readerId,
+        reader: filters.reader,
+        status: filters.status,
+      }),
     ]);
 
     const totalPages =
