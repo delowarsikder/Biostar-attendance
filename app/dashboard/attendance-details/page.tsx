@@ -212,7 +212,7 @@ export default function AttendanceDetailsPage() {
 
   const now = new Date();
 
-  
+
   /*
    * ========================================
    * Active filters
@@ -430,20 +430,20 @@ export default function AttendanceDetailsPage() {
                 type="button"
                 onClick={handleExportExcel}
                 disabled={loading || records.length === 0}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+                className="group inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 shadow-sm transition-all duration-200 hover:border-emerald-300 hover:bg-emerald-100 hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-400 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/50"
               >
-                <Download className="h-4 w-4" />
-                Export Excel
+                <Download className="h-4 w-4 transition-transform duration-200 group-hover:translate-y-0.5" />
+                <span>Excel</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleExportPDF}
                 disabled={loading || records.length === 0}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+                className="group inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-700 shadow-sm transition-all duration-200 hover:border-red-300 hover:bg-red-100 hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400 dark:hover:border-red-800 dark:hover:bg-red-950/50"
               >
-                <Download className="h-4 w-4" />
-                Export PDF
+                <Download className="h-4 w-4 transition-transform duration-200 group-hover:translate-y-0.5" />
+                <span> PDF</span>
               </button>
 
               <button
