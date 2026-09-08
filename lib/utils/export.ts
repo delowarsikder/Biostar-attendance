@@ -115,7 +115,21 @@ export function formatExportDate(date: string): string {
 /**
  * Generate filename with date
  */
-export function generateExportFilename(base: string, date: string, type: "excel" | "pdf"): string {
+ export function generateExportFilename(
+  base: string,
+  date: string,
+  includeTime = false
+): string {
   const formattedDate = formatExportDate(date);
-  return `${base}_${formattedDate}.${type}`;
+
+  if (!includeTime) {
+    return `${base}_${formattedDate}`;
+  }
+
+  const time = new Date()
+    .toTimeString()
+    .slice(0, 8)
+    .replace(/:/g, "");
+
+  return `${formattedDate}_${base}_${time}`;
 }

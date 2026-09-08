@@ -99,7 +99,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
               dark:text-slate-400
             "
           >
-            BioStar attendance monitoring system
+            Khulna 225MW CCPP attendance system
           </p>
         </div>
       </div>

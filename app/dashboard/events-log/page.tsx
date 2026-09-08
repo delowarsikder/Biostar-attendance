@@ -21,7 +21,7 @@ import {
   EventsLogExportParams,
 } from "@/lib/api/events-log.api";
 
-import { exportToExcel, exportToPDF } from "@/lib/utils/export";
+import { exportToExcel, exportToPDF, generateExportFilename } from "@/lib/utils/export";
 
 import {
   ATTENDANCE_READERS,
@@ -377,7 +377,7 @@ export default function EventsLogPage() {
       });
 
       exportToExcel({
-        filename: `${date.replace(/-/g, "")}_events-log_${new Date().toTimeString().slice(0, 8).replace(/:/g, "")}`,
+        filename: generateExportFilename("attendance-details", date, true),
         sheetName: "Events Log",
         columns,
         data: exportData,

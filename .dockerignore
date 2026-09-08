@@ -1,0 +1,17 @@
+node_modules
+.agents
+.claude
+.cursor
+.devin
+.next
+AGENTS.md
+CLAUDE.md
+.git
+*.log
+.env
+.env.local
+.DS_Store
+dist
+build
+*.md
+.gitignore

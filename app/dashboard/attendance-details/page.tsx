@@ -4,10 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CalendarDays, CheckCircle2, ChevronDown, Clock3, ClockAlert, Download, Filter, RefreshCw, Search, UserX, Users, X,
 } from "lucide-react";
+
 import DashboardShell from "@/components/dashboard-v1/layout/dashboard-shell";
 
 import { AttendanceRecord, AttendanceSummary, AttendancePagination, getAttendance, getAttendanceForExport, AttendanceExportParams, } from "@/lib/api/attendance.api";
-import { exportToExcel, exportToPDF } from "@/lib/utils/export";
+import { exportToExcel, exportToPDF, generateExportFilename } from "@/lib/utils/export";
 import { ATTENDANCE_READERS } from "@/app/modules/attendance/attendance.constants";
 /*
  * ========================================
@@ -211,9 +212,7 @@ export default function AttendanceDetailsPage() {
 
   const now = new Date();
 
-  const time = now.toTimeString().slice(0, 8).replace(/:/g, "");
-  const dateForFilename = now.toISOString().slice(0, 10).replace(/-/g, "");
-  const filename = `${dateForFilename}_attendance_${time}`;
+  
   /*
    * ========================================
    * Active filters
@@ -320,7 +319,7 @@ export default function AttendanceDetailsPage() {
       }));
 
       exportToExcel({
-        filename: filename,
+        filename: generateExportFilename("attendance", date, true),
         sheetName: "Attendance",
         columns,
         data: exportData,
@@ -373,7 +372,7 @@ export default function AttendanceDetailsPage() {
       }));
 
       exportToPDF({
-        filename: filename,
+        filename: generateExportFilename("attendance", date, true),
         columns,
         data: exportData,
         title: "Daily Attendance Report",

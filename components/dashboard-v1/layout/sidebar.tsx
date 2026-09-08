@@ -109,7 +109,7 @@ export default function Sidebar({
             {!collapsed && (
               <div>
                 <div className="text-sm font-bold text-slate-900 dark:text-white">
-                  BIOSTAR
+                  Khulna 225MW CCPP
                 </div>
                 <div className="text-[10px] font-medium tracking-wider text-slate-500">
                   ATTENDANCE
