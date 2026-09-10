@@ -13,6 +13,7 @@ import {
   Settings,
   X,
 } from "lucide-react";
+import Image from "next/image";
 
 interface SidebarProps {
   collapsed: boolean;
@@ -98,13 +99,25 @@ export default function Sidebar({
           `}
         >
           <Link
-            href="/dashboard"
+            href="/"
             onClick={onMobileClose}
             className="flex items-center gap-3"
           >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white dark:bg-white dark:text-slate-900">
-              B
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white">
+                <Image
+                  src="/logo/nwpgcl.png"
+                  alt="NWPGCL Logo"
+                  width={40}
+                  height={40}
+                  className="h-10 w-10 object-contain"
+                  priority
+                />
+              </div>
+
             </div>
+
+
 
             {!collapsed && (
               <div>
@@ -156,10 +169,9 @@ export default function Sidebar({
                         flex items-center rounded-lg px-3 py-2.5
                         text-sm font-medium transition-colors
                         ${collapsed ? "justify-center" : "gap-3"}
-                        ${
-                          isActive
-                            ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-                            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+                        ${isActive
+                          ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
+                          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
                         }
                       `}
                     >

@@ -14,10 +14,7 @@ RUN npm install
 
 # Copy application source
 COPY . .
-
 # Build Next.js
 RUN npm run build
-
 EXPOSE 5001
-
-CMD ["npm", "start"]
+CMD ["npm", "start", "--", "-p", "5001"]
