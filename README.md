@@ -5,6 +5,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 First, run the development server:
 
 ```bash
+npm install
 npm run dev -- -p 5001
 # or
 yarn dev
@@ -14,7 +15,8 @@ pnpm dev
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:5001](http://localhost:5001) with your browser to see the result.
+
 ## docker project
 ```text
 docker system prune -f
